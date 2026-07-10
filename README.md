@@ -15,7 +15,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
 | Fonts       | Fira Sans (body), Fira Code (heading/mono)
-| Testing     | Vitest (11 suites, 25 tests)        |
+| Testing     | Vitest (11 suites, 29 tests)        |
 | Logging     | Structured logger (JSON, level-filtered)  |
 | Health      | `/api/health` endpoint              |
 
@@ -43,7 +43,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 ## Security
 
 > [!IMPORTANT]
-> 9 rounds of comprehensive security audits completed. All High, Medium, and Low severity findings resolved. Zero known security vulnerabilities.
+> 10 rounds of comprehensive security audits completed. All High, Medium, and Low severity findings resolved. Zero known security vulnerabilities.
 
 ### Authentication & Access Control
 
@@ -109,12 +109,13 @@ src/
     ├── 002_indexes_and_constraints
     ├── 003_add_vat_payable
     ├── 004_hmac_hardening
-    └── 005_add_cashier_id_to_customer_ledger
+    ├── 005_add_cashier_id_to_customer_ledger
+    └── 006_recalculate_ledger_hmacs [JS]
 ```
 
 ## Testing
 
-**11 test suites · 25 tests · all passing · tsc --noEmit clean**
+**11 test suites · 29 tests · all passing · tsc --noEmit clean**
 
 All tests run against in-memory SQLite with the full migration suite applied. Worker threads gracefully fall back to inline queries for in-memory databases.
 
