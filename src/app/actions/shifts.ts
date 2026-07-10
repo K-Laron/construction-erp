@@ -3,12 +3,8 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId } from './auth';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
-function checkMlek(): void {
-  if (!(global as any).mlekSecret) {
-    throw new Error("DATABASE_LOCKED: Store is locked.");
-  }
-}
 
 // Open a new cashier shift
 export async function openShift(_ignoredCashierId: string, openingFloat: number): Promise<string> {
@@ -24,7 +20,7 @@ export async function openShift(_ignoredCashierId: string, openingFloat: number)
   const shiftId = crypto.randomUUID();
   db.prepare(`
     INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status)
-    VALUES (?, ?, datetime('now'), ?, 'Open')
+    VALUES (?, ?, CURRENT_TIMESTAMP, ?, 'Open')
   `).run(shiftId, cashierId, openingFloat);
 
   return shiftId;
@@ -42,13 +38,13 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
   const cashSales = db.prepare(`
     SELECT COALESCE(SUM(amount_paid), 0) as total
     FROM transactions
-    WHERE cashier_id = ? AND payment_method = 'Cash' AND date >= ? AND date <= datetime('now')
+    WHERE cashier_id = ? AND payment_method = 'Cash' AND date >= ? AND date <= CURRENT_TIMESTAMP
   `).get(shift.cashier_id, shift.opened_at) as { total: number };
 
   const collections = db.prepare(`
     SELECT COALESCE(SUM(amount), 0) as total 
     FROM customer_ledger 
-    WHERE type = 'CREDIT' AND cashier_id = ? AND date >= ? AND date <= datetime('now')
+    WHERE type = 'CREDIT' AND cashier_id = ? AND date >= ? AND date <= CURRENT_TIMESTAMP
   `).get(shift.cashier_id, shift.opened_at) as { total: number };
 
   const expectedCash = shift.opening_float + cashSales.total + collections.total;
@@ -58,7 +54,7 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
   db.transaction(() => {
     // 1. Close the shift
     db.prepare(`
-      UPDATE shifts SET closed_at = datetime('now'), closing_cash_actual = ?, status = 'Closed', z_reading_id = ?
+      UPDATE shifts SET closed_at = CURRENT_TIMESTAMP, closing_cash_actual = ?, status = 'Closed', z_reading_id = ?
       WHERE id = ?
     `).run(actualCash, zReadingId, shiftId);
 
@@ -71,32 +67,38 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
         COALESCE(SUM(CASE WHEN tax > 0 THEN subtotal - tax ELSE 0 END), 0) as vatable_sales,
         COALESCE(SUM(CASE WHEN tax = 0 THEN subtotal ELSE 0 END), 0) as exempt_sales
       FROM transactions 
-      WHERE cashier_id = ? AND date >= ? AND date <= datetime('now')
+      WHERE cashier_id = ? AND date >= ? AND date <= CURRENT_TIMESTAMP
     `).get(shift.cashier_id, shift.opened_at) as any;
 
-    // Count voids/returns during this shift
+    // N3: Count voids and returns separately
     const voidsCount = db.prepare(`
       SELECT COALESCE(COUNT(*), 0) as total
       FROM system_audit_logs
-      WHERE action_type IN ('SALE_RETURN', 'SALE_VOID') AND timestamp >= ? AND timestamp <= datetime('now') AND user_id = ?
+      WHERE action_type = 'SALE_VOID' AND timestamp >= ? AND timestamp <= CURRENT_TIMESTAMP AND user_id = ?
+    `).get(shift.opened_at, shift.cashier_id) as { total: number };
+
+    const returnsCount = db.prepare(`
+      SELECT COALESCE(COUNT(*), 0) as total
+      FROM system_audit_logs
+      WHERE action_type = 'SALE_RETURN' AND timestamp >= ? AND timestamp <= CURRENT_TIMESTAMP AND user_id = ?
     `).get(shift.opened_at, shift.cashier_id) as { total: number };
 
     // Collections already calculated above
 
     db.prepare(`
       INSERT INTO shift_z_readings (id, shift_id, date, gross_sales, vat_collected, vatable_sales, exempt_sales, total_voids, total_returns, total_collections)
-      VALUES (?, ?, date('now'), ?, ?, ?, ?, ?, 0, ?)
+      VALUES (?, ?, date('now'), ?, ?, ?, ?, ?, ?, ?)
     `).run(
       zReadingId, shiftId,
       salesAgg.gross_sales, salesAgg.vat_collected,
       salesAgg.vatable_sales, salesAgg.exempt_sales,
-      voidsCount.total, collections.total
+      voidsCount.total, returnsCount.total, collections.total
     );
 
     // 3. Audit log
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), ?, 'SHIFT_CLOSE', ?, ?, ?)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'SHIFT_CLOSE', ?, ?, ?)
     `).run(crypto.randomUUID(), shift.cashier_id, shiftId, `Expected: ${expectedCash}`, `Actual: ${actualCash}, Disc: ${discrepancy}`);
   })();
 

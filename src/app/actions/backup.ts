@@ -4,9 +4,10 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 export async function exportEncryptedBackup(): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
-  const secret = (global as any).mlekSecret;
+  const secret = getMlekSecret();
   if (!secret) {
     return { success: false, error: "Store is locked." };
   }
@@ -53,7 +54,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
 
 // Get the night backup logs from the system audit log
 export async function getBackupLogs(): Promise<any[]> {
-  const secret = (global as any).mlekSecret;
+  const secret = getMlekSecret();
   if (!secret) return [];
   
   return db.prepare(`

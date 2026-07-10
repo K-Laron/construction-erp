@@ -84,7 +84,7 @@ describe('Transaction Server Actions', () => {
 
     // Need a customer
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 1000, 0, 1, datetime('now'))`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 1000, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1120, 1120, 1)`).run(itemId);
@@ -116,7 +116,7 @@ describe('Transaction Server Actions', () => {
     // Process a return
     await processReturn(transactionId, [
       { itemId, quantity: 1000 }
-    ], 'user');
+    ]);
 
     // Return should debit vat-payable by 120
     const returnVatLine = db.prepare(`SELECT SUM(amount) as total FROM journal_lines WHERE account_id = 'acc-vat-payable' AND type = 'DEBIT'`).get() as { total: number };

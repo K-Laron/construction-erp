@@ -13,6 +13,7 @@ import DeliveryDispatch from '@/components/deliveries/DeliveryDispatch';
 import ReportsPanel from '@/components/reports/ReportsPanel';
 import MaintenancePanel from '@/components/maintenance/MaintenancePanel';
 import A5PrintReceipt from '@/components/print/A5PrintReceipt';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 export default function Home() {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
@@ -147,7 +148,9 @@ export default function Home() {
           currentUser={currentUser}
           isUnlocked={isUnlocked}
         >
-          {renderActiveView()}
+          <ErrorBoundary key={activeView}>
+            {renderActiveView()}
+          </ErrorBoundary>
         </DashboardLayout>
       </div>
     </>

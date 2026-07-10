@@ -7,14 +7,12 @@ CREATE INDEX IF NOT EXISTS idx_shifts_cashier_id ON shifts(cashier_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_cashier_id ON transactions(cashier_id);
 
 -- Add constraints via recreation since SQLite lacks ALTER TABLE ADD CONSTRAINT
-PRAGMA foreign_keys=OFF;
-
 
 -- Recreate shifts table to fix column count and type mismatch
 CREATE TABLE shifts_new (
   id TEXT PRIMARY KEY,
   cashier_id TEXT NOT NULL REFERENCES users(id),
-  opened_at TEXT NOT NULL DEFAULT (datetime('now')),
+  opened_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   closed_at TEXT,
   opening_float INTEGER NOT NULL,
   closing_cash_actual INTEGER,
@@ -81,4 +79,3 @@ BEGIN
 END;
 
 
-PRAGMA foreign_keys=ON;

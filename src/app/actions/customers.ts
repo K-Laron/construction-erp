@@ -7,18 +7,9 @@ import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { getActiveUserId } from './auth';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
-// Helper to check for MLEK
-function getMlekSecret(): Buffer {
-  const secret = (global as any).mlekSecret;
-  if (!secret) {
-    throw new Error("DATABASE_LOCKED: Store is locked. Operational unlock required.");
-  }
-  return secret;
-}
-
-
-
+// Removed local getMlekSecret
 // Fetch all active customers
 export async function getCustomers(): Promise<Customer[]> {
   const secret = getMlekSecret();
@@ -48,7 +39,7 @@ export async function createCustomer(
 
   db.prepare(`
     INSERT INTO customers (id, name, phone, address, credit_limit, current_balance, price_tier, is_vat_exempt, is_active, created_at)
-    VALUES (?, ?, ?, ?, ?, 0, ?, ?, 1, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?, 1, CURRENT_TIMESTAMP)
   `).run(customerId, name, encryptedPhone, encryptedAddress, creditLimit, priceTier, isVatExempt);
 
   return customerId;

@@ -3,12 +3,8 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId } from './auth';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
-function checkMlek(): void {
-  if (!(global as any).mlekSecret) {
-    throw new Error("DATABASE_LOCKED: Store is locked.");
-  }
-}
 
 // Fetch pending deliveries
 export async function getPendingDeliveries(): Promise<any[]> {
@@ -75,7 +71,7 @@ export async function dispatchDelivery(
     // 1. Create delivery record
     db.prepare(`
       INSERT INTO deliveries (id, transaction_id, delivery_date, driver_name, truck_plate, status)
-      VALUES (?, ?, datetime('now'), ?, ?, 'Dispatched')
+      VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, 'Dispatched')
     `).run(deliveryId, transactionId, driverName, truckPlate);
 
     // 2. Insert delivery items
@@ -100,16 +96,18 @@ export async function dispatchDelivery(
 
     // 4. Check if transaction is fully delivered
     const remaining = db.prepare(`
-      SELECT 
-        ti.item_id,
-        ti.quantity - COALESCE(
-          (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
-           JOIN deliveries d ON di.delivery_id = d.id 
-           WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
-        ) as remaining_qty
-      FROM transaction_items ti
-      WHERE ti.transaction_id = ?
-      HAVING remaining_qty > 0
+      WITH item_remaining AS (
+        SELECT 
+          ti.item_id,
+          ti.quantity - COALESCE(
+            (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
+             JOIN deliveries d ON di.delivery_id = d.id 
+             WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
+          ) as remaining_qty
+        FROM transaction_items ti
+        WHERE ti.transaction_id = ?
+      )
+      SELECT * FROM item_remaining WHERE remaining_qty > 0
     `).all(transactionId, transactionId);
 
     const newStatus = remaining.length === 0 ? 'Fully Delivered' : 'Partially Delivered';
@@ -118,7 +116,7 @@ export async function dispatchDelivery(
     // 5. Audit log
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
     `).run(crypto.randomUUID(), userId, deliveryId, `Driver: ${driverName}, Plate: ${truckPlate}, Items: ${items.length}`);
   })();
 

@@ -180,7 +180,7 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
         throw new Error('Please enter a return quantity greater than 0.');
       }
 
-      await processReturn(activeTxnDetails.transaction.id, itemsToReturn, currentUser.id);
+      await processReturn(activeTxnDetails.transaction.id, itemsToReturn);
       toast.success('Return processed and inventory restocked successfully!');
       setActiveTxnDetails(null);
       setTxnSearchId('');

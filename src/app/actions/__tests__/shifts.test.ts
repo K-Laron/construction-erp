@@ -14,7 +14,7 @@ describe('Shift Actions', () => {
     // Mock some sales using transactions manually
     const transactionId = crypto.randomUUID();
     db.prepare(`INSERT INTO transactions (id, cashier_id, date, subtotal, tax, total_amount, amount_paid, payment_status, payment_method, delivery_status) 
-      VALUES (?, 'system-daemon', datetime('now'), 1000, 100, 1100, 1100, 'Paid', 'Cash', 'N/A')`).run(transactionId);
+      VALUES (?, 'system-daemon', CURRENT_TIMESTAMP, 1000, 100, 1100, 1100, 'Paid', 'Cash', 'N/A')`).run(transactionId);
     
     // Expected cash: 5000 + 1100 = 6100.
     const { discrepancy } = await closeShift(shiftId, 6000);

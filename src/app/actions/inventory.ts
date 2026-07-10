@@ -7,15 +7,7 @@ import crypto from 'crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { getActiveUserId } from './auth';
-
-// Helper to check for MLEK
-function getMlekSecret(): Buffer {
-  const secret = (global as any).mlekSecret;
-  if (!secret) {
-    throw new Error("DATABASE_LOCKED: Store is locked.");
-  }
-  return secret;
-}
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 // Fetch active inventory (values in millicounts/centavos)
 export async function getInventory(): Promise<InventoryItem[]> {
@@ -115,7 +107,7 @@ export async function createPurchaseOrder(
   db.transaction(() => {
     db.prepare(`
       INSERT INTO purchase_orders (id, supplier_id, date, total_cost, payment_method, status)
-      VALUES (?, ?, datetime('now'), ?, ?, 'Draft')
+      VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, 'Draft')
     `).run(poId, supplierId, roundedTotalCost, paymentMethod);
 
     const insertItem = db.prepare(`
@@ -145,7 +137,7 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
     // 2. Log goods receipt
     db.prepare(`
       INSERT INTO goods_receipts (id, purchase_order_id, date, received_by)
-      VALUES (?, ?, datetime('now'), ?)
+      VALUES (?, ?, CURRENT_TIMESTAMP, ?)
     `).run(receiptId, purchaseOrderId, receivedBy);
 
     // 3. Fetch PO details
@@ -191,7 +183,7 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
       const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
       const ledgerId = crypto.randomUUID();
       const entryData = { id: ledgerId, supplier_id: po.supplier_id, date: new Date().toISOString(), type: 'CHARGE' as const, amount: po.total_cost, reference_id: purchaseOrderId, description: 'Goods Receipt (Credit)' };
-      const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
+      const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
 
       db.prepare(`
         INSERT INTO supplier_ledger (id, supplier_id, date, type, amount, reference_id, description, hmac_signature)

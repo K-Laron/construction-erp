@@ -1,5 +1,6 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 export interface JournalLineInput {
   accountId: string;
@@ -7,11 +8,6 @@ export interface JournalLineInput {
   amount: number; // Stored in centavos
 }
 
-function checkMlek(): void {
-  if (!(global as any).mlekSecret) {
-    throw new Error("DATABASE_LOCKED: Store is locked.");
-  }
-}
 
 // General Ledger Transaction: enforces sum(debits) = sum(credits)
 export function createBalancedJournalEntry(
@@ -33,7 +29,7 @@ export function createBalancedJournalEntry(
   const executeTx = db.transaction(() => {
     db.prepare(`
       INSERT INTO journal_entries (id, date, description, created_by)
-      VALUES (?, datetime('now'), ?, ?)
+      VALUES (?, CURRENT_TIMESTAMP, ?, ?)
     `).run(entryId, description, createdBy);
 
     const insertLine = db.prepare(`

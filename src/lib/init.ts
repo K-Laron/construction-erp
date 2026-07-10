@@ -1,4 +1,5 @@
 import db, { runMigrations } from '@/lib/db';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 let initialized = false;
 
@@ -28,15 +29,15 @@ export function isStoreConfigured(): boolean {
 
 // Check if MLEK is in memory
 export function isStoreUnlocked(): boolean {
-  return !!(global as any).mlekSecret;
+  return isMlekUnlocked();
 }
 
 // Lock the store (clear MLEK from memory)
 export function lockStore(): void {
-  const secret = (global as any).mlekSecret;
+  const secret = getMlekSecret();
   if (Buffer.isBuffer(secret)) {
     secret.fill(0);
   }
-  (global as any).mlekSecret = null;
+  setMlekSecret(null);
   console.log('[DB] Store locked. MLEK cleared from process memory.');
 }

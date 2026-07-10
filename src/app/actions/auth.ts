@@ -3,10 +3,8 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getSession } from '@/lib/session';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
-function checkMlek(): void {
-  if (!(global as any).mlekSecret) throw new Error("DATABASE_LOCKED: Store is locked.");
-}
 
 export async function getActiveUserId(): Promise<string> {
   const session = await getSession();
@@ -102,7 +100,7 @@ export async function createUser(
 
   db.prepare(`
     INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, datetime('now'), ?, 'USER_CREATED', ?, NULL, ?)
+    VALUES (?, CURRENT_TIMESTAMP, ?, 'USER_CREATED', ?, NULL, ?)
   `).run(crypto.randomUUID(), createdBy, userId, `User ${username} created as ${role}`);
 
   return userId;
@@ -123,7 +121,7 @@ export async function updateCostPrice(_ignoredUserId: string, itemId: string, ne
 
   db.prepare(`
     INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, datetime('now'), ?, 'COST_PRICE_CHANGE', ?, ?, ?)
+    VALUES (?, CURRENT_TIMESTAMP, ?, 'COST_PRICE_CHANGE', ?, ?, ?)
   `).run(crypto.randomUUID(), userId, itemId, String(old.cost_price), String(newCostCentavos));
 }
 
@@ -137,6 +135,6 @@ export async function overrideCreditLimit(_ignoredUserId: string, customerId: st
 
   db.prepare(`
     INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, datetime('now'), ?, 'CREDIT_LIMIT_OVERRIDE', ?, ?, ?)
+    VALUES (?, CURRENT_TIMESTAMP, ?, 'CREDIT_LIMIT_OVERRIDE', ?, ?, ?)
   `).run(crypto.randomUUID(), userId, customerId, String(old.credit_limit), String(newLimitCentavos));
 }

@@ -29,7 +29,7 @@ describe('Auth Actions', () => {
 
     // Create a customer with credit limit 10
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 10, 0, 1, datetime('now'))`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 10, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);

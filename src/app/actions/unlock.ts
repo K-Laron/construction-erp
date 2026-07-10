@@ -3,6 +3,7 @@
 import db, { runMigrations } from '@/lib/db';
 import { deriveKey, encryptField, decryptField } from '@/lib/crypto';
 import crypto from 'crypto';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 export interface UnlockResult {
   success: boolean;
@@ -12,7 +13,7 @@ export interface UnlockResult {
 
 // Check if store is already unlocked in process memory
 export async function isStoreUnlocked(): Promise<boolean> {
-  return !!(global as any).mlekSecret;
+  return isMlekUnlocked();
 }
 
 // Check if this is the first boot (config keys missing)
@@ -83,7 +84,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
     })();
 
     // Load MLEK into process memory
-    (global as any).mlekSecret = mlek;
+    setMlekSecret(mlek);
 
     return { success: true };
   } catch (err: any) {
@@ -120,7 +121,7 @@ export async function unlockStore(dop: string, ipAddress: string = '127.0.0.1'):
     const decryptedMlek = decryptField(dopConfig.value, derivedKey);
 
     // Save decrypted key in server memory
-    (global as any).mlekSecret = Buffer.from(decryptedMlek, 'hex');
+    setMlekSecret(Buffer.from(decryptedMlek, 'hex'));
 
     // Run programmatic JS migrations
     await runMigrations(decryptedMlek);
@@ -141,7 +142,7 @@ export async function unlockStore(dop: string, ipAddress: string = '127.0.0.1'):
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), NULL, 'STORE_UNLOCK_FAILED', NULL, NULL, ?)
+      VALUES (?, CURRENT_TIMESTAMP, NULL, 'STORE_UNLOCK_FAILED', NULL, NULL, ?)
     `).run(crypto.randomUUID(), ipAddress);
 
     return { success: false, error: "Invalid Daily Operational Passphrase." };
@@ -193,7 +194,7 @@ export async function recoverStore(mnemonicWords: string[], newDop: string, ipAd
     })();
 
     // Set MLEK in memory
-    (global as any).mlekSecret = Buffer.from(decryptedMlek, 'hex');
+    setMlekSecret(Buffer.from(decryptedMlek, 'hex'));
 
     db.prepare(`
       INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful)
@@ -202,7 +203,7 @@ export async function recoverStore(mnemonicWords: string[], newDop: string, ipAd
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), NULL, 'STORE_RECOVERY_SUCCESS', NULL, NULL, ?)
+      VALUES (?, CURRENT_TIMESTAMP, NULL, 'STORE_RECOVERY_SUCCESS', NULL, NULL, ?)
     `).run(crypto.randomUUID(), ipAddress);
 
     return { success: true };
@@ -214,7 +215,7 @@ export async function recoverStore(mnemonicWords: string[], newDop: string, ipAd
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), NULL, 'STORE_RECOVERY_FAILED', NULL, NULL, ?)
+      VALUES (?, CURRENT_TIMESTAMP, NULL, 'STORE_RECOVERY_FAILED', NULL, NULL, ?)
     `).run(crypto.randomUUID(), ipAddress);
 
     return { success: false, error: "Invalid Recovery Mnemonic Passphrase." };

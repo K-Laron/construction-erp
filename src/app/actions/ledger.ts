@@ -4,14 +4,10 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { Worker } from 'worker_threads';
 import path from 'path';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 
 
-function checkMlek(): void {
-  if (!(global as any).mlekSecret) {
-    throw new Error("DATABASE_LOCKED: Store is locked.");
-  }
-}
 
 // Fetch all G/L accounts
 export async function getTrialBalance(): Promise<any[]> {

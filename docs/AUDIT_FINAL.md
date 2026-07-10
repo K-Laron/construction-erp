@@ -29,3 +29,8 @@ All 7 tests across 5 test suites (Auth, Inventory, Ledger, Shifts, Transactions)
 - **M2 (Dispatch Quantity Verification):** Added server-side validation to ensure dispatched quantities never exceed the transaction's remaining quantity.
 - **M4 (Session Security):** Eliminated the predictable fallback password in `session.ts`. Added a securely generated random fallback for development/testing, and strictly enforce the `SESSION_PASSWORD` env var in production.
 - **M6 (Manager Override UI):** Fixed `CheckoutModal.tsx` dependency logic to correctly prompt for the manager override PIN when a discount is applied, rather than silently blocking submission.
+
+## Phase 5 Final Hardening and Refinements (N5, N7, N8, N10)
+- **Test Infrastructure Hardening (N5):** Fixed all tests that mutated immutable DB schema (`PRAGMA writable_schema`, `sqlite_master`). Test suites now reliably pass.
+- **SQLite Portability (N7):** Ported non-portable SQLite functions to agnostic formats. Replaced `datetime('now')` with `CURRENT_TIMESTAMP` across 14 codebase files to standardize UTC timestamp behavior and support broader SQL compatibility. Removed `PRAGMA foreign_keys=OFF` from schema migrations.
+- **UI Error Resilience (N8):** Introduced a global `ErrorBoundary` component (`src/components/ui/ErrorBoundary.tsx`) and wrapped the active dashboard view inside `page.tsx`. A crash in one specific dashboard tab (e.g. POS or Inventory) now isolates the error, preventing the entire SPA from crashing and displaying a fatal route error.

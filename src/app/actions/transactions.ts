@@ -2,10 +2,12 @@
 
 import db from '@/lib/db';
 import crypto from 'crypto';
+import { Transaction, TransactionItem } from '@/types';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry, JournalLineInput } from '@/lib/ledger_helpers';
 import { z } from 'zod';
 import { getActiveUserId } from './auth';
+import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 export interface CartItem {
   itemId: string;
@@ -54,11 +56,6 @@ export const CheckoutPayloadSchema = z.object({
   overridePin: z.string().optional()
 });
 
-function checkMlek(): void {
-  if (!(global as any).mlekSecret) {
-    throw new Error("DATABASE_LOCKED: Store is locked.");
-  }
-}
 
 // Main checkout action
 export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ transactionId: string; siNumber: number | null; orNumber: number | null }> {
@@ -73,10 +70,12 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
   const cashierId = await getActiveUserId();
 
   let customerPriceTier = 'Retail';
+  let isVatExempt = false;
   if (customerId) {
-    const cust = db.prepare("SELECT price_tier FROM customers WHERE id = ?").get(customerId) as { price_tier: string } | undefined;
-    if (cust && cust.price_tier) {
-      customerPriceTier = cust.price_tier;
+    const cust = db.prepare("SELECT price_tier, is_vat_exempt FROM customers WHERE id = ?").get(customerId) as { price_tier: string; is_vat_exempt: number } | undefined;
+    if (cust) {
+      if (cust.price_tier) customerPriceTier = cust.price_tier;
+      if (cust.is_vat_exempt) isVatExempt = true;
     }
   }
 
@@ -107,8 +106,8 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
 
   if (totalAmount < 0) throw new Error("Total amount cannot be negative.");
 
-  // C2: Force server-side tax recalculation to prevent VAT underreporting
-  tax = Math.round(((computedSubtotal - discount) / 1.12) * 0.12);
+  // C2 & N1: Force server-side tax recalculation, respecting VAT exemption
+  tax = isVatExempt ? 0 : Math.round(((computedSubtotal - discount) / 1.12) * 0.12);
 
   // Manager Override Helper
   const verifyOverride = (pin: string | undefined, errorMsg: string) => {
@@ -154,7 +153,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     // 1. Insert transaction header
     db.prepare(`
       INSERT INTO transactions (id, customer_id, cashier_id, date, subtotal, tax, delivery_fee, discount, total_amount, amount_paid, balance_due, payment_status, payment_method, delivery_status)
-      VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       transactionId, customerId, cashierId,
       subtotal, tax, deliveryFee, discount,
@@ -206,7 +205,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
         description: `Sales Invoice charge - Txn ${transactionId.slice(0, 8)}`
       };
 
-      const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
+      const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
 
       db.prepare(`
         INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
@@ -254,7 +253,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
 }
 
 // Fetch all transactions for a date range
-export async function getTransactions(startDate?: string, endDate?: string): Promise<any[]> {
+export async function getTransactions(startDate?: string, endDate?: string): Promise<Transaction[]> {
   checkMlek();
   let query = "SELECT * FROM transactions";
   const params: string[] = [];
@@ -265,19 +264,19 @@ export async function getTransactions(startDate?: string, endDate?: string): Pro
   }
   query += " ORDER BY date DESC";
 
-  return db.prepare(query).all(...params);
+  return db.prepare(query).all(...params) as Transaction[];
 }
 
 // Fetch transaction details with items
-export async function getTransactionDetails(transactionId: string): Promise<any> {
-  checkMlek();
-  const transaction = db.prepare("SELECT * FROM transactions WHERE id = ?").get(transactionId);
+export async function getTransactionDetails(transactionId: string): Promise<{ transaction: Transaction; items: (TransactionItem & { item_name: string; item_unit: string })[] }> {
+  getMlekSecret(); // Ensure unlocked
+  const transaction = db.prepare("SELECT * FROM transactions WHERE id = ?").get(transactionId) as Transaction;
   const items = db.prepare(`
     SELECT ti.*, i.name as item_name, i.unit as item_unit
     FROM transaction_items ti 
     JOIN inventory i ON ti.item_id = i.id
     WHERE ti.transaction_id = ?
-  `).all(transactionId);
+  `).all(transactionId) as (TransactionItem & { item_name: string; item_unit: string })[];
 
   return { transaction, items };
 }
@@ -285,17 +284,17 @@ export async function getTransactionDetails(transactionId: string): Promise<any>
 // Process a return / void
 export async function processReturn(
   transactionId: string,
-  itemsToReturn: { itemId: string; quantity: number }[],
-  _ignoredProcessedBy: string
+  itemsToReturn: { itemId: string; quantity: number }[]
 ): Promise<void> {
-  checkMlek();
+  getMlekSecret(); // Ensure unlocked
   const processedBy = await getActiveUserId();
 
   db.transaction(() => {
     const tx = db.prepare("SELECT payment_method, balance_due, customer_id, tax, total_amount FROM transactions WHERE id = ?").get(transactionId) as { payment_method: string; balance_due: number; customer_id: string | null; tax: number; total_amount: number };
     if (!tx) throw new Error("Transaction not found.");
 
-    let remainingBalance = tx.balance_due;
+    let totalRefundAmount = 0;
+    let totalCostRefund = 0;
 
     for (const item of itemsToReturn) {
       const origItem = db.prepare(`
@@ -313,63 +312,70 @@ export async function processReturn(
       // Restock inventory
       db.prepare("UPDATE inventory SET stock_quantity = stock_quantity + ? WHERE id = ?").run(item.quantity, item.itemId);
 
-      if (origItem) {
-        const refundAmount = Math.round(origItem.unit_price * item.quantity / 1000);
-        const costRefund = Math.round(origItem.unit_cost * item.quantity / 1000);
+      totalRefundAmount += Math.round(origItem.unit_price * item.quantity / 1000);
+      totalCostRefund += Math.round(origItem.unit_cost * item.quantity / 1000);
+    }
 
-        const refundVat = tx.tax > 0 && tx.total_amount > 0 ? Math.round(refundAmount * tx.tax / tx.total_amount) : 0;
-        const refundRevenue = refundAmount - refundVat;
+    if (totalRefundAmount > 0) {
+      const refundVat = tx.tax > 0 && tx.total_amount > 0 ? Math.round(totalRefundAmount * tx.tax / tx.total_amount) : 0;
+      const refundRevenue = totalRefundAmount - refundVat;
 
-        // G/L reversal
-        const glLines: { accountId: string; type: 'DEBIT' | 'CREDIT'; amount: number }[] = [];
+      // G/L reversal
+      const glLines: { accountId: string; type: 'DEBIT' | 'CREDIT'; amount: number }[] = [];
+      glLines.push({ accountId: 'acc-revenue', type: 'DEBIT', amount: refundRevenue });
+      if (refundVat > 0) {
+        glLines.push({ accountId: 'acc-vat-payable', type: 'DEBIT', amount: refundVat });
+      }
 
-        if (refundAmount > 0) {
-          glLines.push({ accountId: 'acc-revenue', type: 'DEBIT', amount: refundRevenue });
-          if (refundVat > 0) {
-            glLines.push({ accountId: 'acc-vat-payable', type: 'DEBIT', amount: refundVat });
-          }
-          if (tx.payment_method === 'Credit' && remainingBalance > 0) {
-            const actualCreditRefund = Math.min(refundAmount, remainingBalance);
-            const remainderCashRefund = refundAmount - actualCreditRefund;
-            
-            glLines.push({ accountId: 'acc-ar', type: 'CREDIT', amount: actualCreditRefund });
-            if (remainderCashRefund > 0) {
-              glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: remainderCashRefund });
-            }
-
-            if (tx.customer_id) {
-              db.prepare("UPDATE customers SET current_balance = MAX(0, current_balance - ?) WHERE id = ?").run(actualCreditRefund, tx.customer_id);
-              db.prepare("UPDATE transactions SET balance_due = MAX(0, balance_due - ?) WHERE id = ?").run(actualCreditRefund, transactionId);
-              remainingBalance -= actualCreditRefund; // update local var for next loop iteration
-              
-              const lastLedger = db.prepare(`SELECT hmac_signature FROM customer_ledger WHERE customer_id = ? ORDER BY date DESC LIMIT 1`).get(tx.customer_id) as { hmac_signature: string } | undefined;
-              const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
-              const ledgerId = crypto.randomUUID();
-              const entryData = { id: ledgerId, customer_id: tx.customer_id, date: new Date().toISOString(), type: 'CREDIT' as const, amount: actualCreditRefund, reference_id: transactionId, description: `Return on Txn ${transactionId.slice(0, 8)}` };
-              const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
-              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id) VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, entryData.date, actualCreditRefund, transactionId, entryData.description, signature, processedBy);
-            }
-          } else {
-            glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: refundAmount });
-          }
+      if (tx.payment_method === 'Credit' && tx.balance_due > 0) {
+        const actualCreditRefund = Math.min(totalRefundAmount, tx.balance_due);
+        const remainderCashRefund = totalRefundAmount - actualCreditRefund;
+        
+        glLines.push({ accountId: 'acc-ar', type: 'CREDIT', amount: actualCreditRefund });
+        if (remainderCashRefund > 0) {
+          glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: remainderCashRefund });
         }
-        if (costRefund > 0) {
-          glLines.push({ accountId: 'acc-inv', type: 'DEBIT', amount: costRefund });
-          glLines.push({ accountId: 'acc-cost-of-sales', type: 'CREDIT', amount: costRefund });
-        }
+        
+        // Update balance due on the transaction
+        db.prepare("UPDATE transactions SET balance_due = balance_due - ? WHERE id = ?").run(actualCreditRefund, transactionId);
 
-        const totalD = glLines.filter(l => l.type === 'DEBIT').reduce((s, l) => s + l.amount, 0);
-        const totalC = glLines.filter(l => l.type === 'CREDIT').reduce((s, l) => s + l.amount, 0);
-        if (totalD === totalC && totalD > 0) {
-          createBalancedJournalEntry(`Return on Txn: ${transactionId.slice(0, 8)}`, glLines, processedBy);
+        // Reverse customer ledger
+        if (tx.customer_id) {
+          db.prepare("UPDATE customers SET current_balance = current_balance - ? WHERE id = ?").run(actualCreditRefund, tx.customer_id);
+          const lastLedger = db.prepare(`SELECT hmac_signature FROM customer_ledger WHERE customer_id = ? ORDER BY date DESC LIMIT 1`).get(tx.customer_id) as { hmac_signature: string } | undefined;
+          const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
+          const ledgerId = crypto.randomUUID();
+          
+          const signature = crypto.createHmac('sha256', getMlekSecret() || process.env.MLEK_SECRET || 'fallback_secret')
+            .update(`${ledgerId}:${tx.customer_id}:CREDIT:${actualCreditRefund}:${prevSig}`)
+            .digest('hex');
+
+          db.prepare(`
+            INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, cashier_id, hmac_signature)
+            VALUES (?, ?, CURRENT_TIMESTAMP, 'CREDIT', ?, ?, ?, ?)
+          `).run(ledgerId, tx.customer_id, actualCreditRefund, transactionId, processedBy, signature);
         }
+      } else {
+        glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: totalRefundAmount });
+      }
+
+      // Cost of Sales reversal
+      if (totalCostRefund > 0) {
+        glLines.push({ accountId: 'acc-cost-of-sales', type: 'CREDIT', amount: totalCostRefund });
+        glLines.push({ accountId: 'acc-inv', type: 'DEBIT', amount: totalCostRefund });
+      }
+
+      const totalD = glLines.filter(l => l.type === 'DEBIT').reduce((s, l) => s + l.amount, 0);
+      const totalC = glLines.filter(l => l.type === 'CREDIT').reduce((s, l) => s + l.amount, 0);
+      if (totalD === totalC && totalD > 0) {
+        createBalancedJournalEntry(`Return: ${transactionId.slice(0, 8)}`, glLines, processedBy);
       }
     }
 
     // Audit log
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), ?, 'SALE_RETURN', ?, NULL, ?)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'SALE_RETURN', ?, NULL, ?)
     `).run(crypto.randomUUID(), processedBy, transactionId, `Returned ${itemsToReturn.length} line items`);
   })();
 }
