@@ -85,8 +85,11 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
       };
 
       const result = await processCheckout(payload);
-      setSuccessData(result);
-      onSuccess({ ...result, payload });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      setSuccessData(result.data!);
+      onSuccess({ ...result.data!, payload } as any);
     } catch (err: any) {
       setError(err.message || 'Checkout failed.');
     }

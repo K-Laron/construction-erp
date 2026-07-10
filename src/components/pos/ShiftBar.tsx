@@ -47,7 +47,9 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
     setLoading(true);
     try {
       const floatCentavos = parsePesoCentavos(openingFloatStr);
-      const shiftId = await openShift(cashierId, floatCentavos);
+      const result = await openShift(cashierId, floatCentavos);
+      if (!result.success) throw new Error(result.error);
+      const shiftId = result.data!;
       setCurrentShiftId(shiftId);
       setOpenTime(new Date().toISOString());
       onShiftChange(shiftId);
@@ -65,11 +67,12 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
     try {
       const actualCashCentavos = parsePesoCentavos(actualCashStr);
       const result = await closeShift(currentShiftId, actualCashCentavos);
+      if (!result.success) throw new Error(result.error);
       setCurrentShiftId(null);
       setOpenTime(null);
       onShiftChange(null);
       setShowCloseModal(false);
-      toast.success(`Shift closed successfully! Discrepancy: ${formatCurrency(result.discrepancy)}`);
+      toast.success(`Shift closed successfully! Discrepancy: ${formatCurrency(result.data!.discrepancy)}`);
     } catch (err: any) {
       setError(err.message || 'Failed to close shift.');
     }

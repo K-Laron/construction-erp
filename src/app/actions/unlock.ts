@@ -9,6 +9,7 @@ export interface UnlockResult {
   success: boolean;
   error?: string;
   isFirstBoot?: boolean;
+  adminPin?: string;
 }
 
 // Check if store is already unlocked in process memory
@@ -64,6 +65,8 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
     const encryptedDop = encryptField(mlekHex, dopKey);
     const encryptedMmp = encryptField(mlekHex, mmpKey);
 
+    let adminPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
+
     db.transaction(() => {
       // Save config
       const insertConfig = db.prepare("INSERT INTO system_config (key, value) VALUES (?, ?)");
@@ -74,7 +77,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
 
       // Seed default admin user (username: admin, PIN: 6-digit random)
       const adminSalt = crypto.randomBytes(16).toString('hex');
-      const adminPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
+      adminPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
       const adminHash = crypto.pbkdf2Sync(adminPin, adminSalt, 600000, 32, 'sha512').toString('hex');
 
       db.prepare(`
@@ -87,8 +90,8 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
     setMlekSecret(mlek);
 
     return { success: true, adminPin };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

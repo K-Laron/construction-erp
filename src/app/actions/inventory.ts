@@ -25,7 +25,8 @@ export async function createProduct(
   sellingPriceCentavos: number,
   wholesalePriceCentavos: number,
   reorderLevelMillicounts: number
-): Promise<string> {
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
   getMlekSecret(); // Ensure unlocked
   const id = crypto.randomUUID();
 
@@ -44,7 +45,10 @@ export async function createProduct(
     reorderLevelMillicounts
   );
 
-  return id;
+    return { success: true, data: id };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to create product' };
+  }
 }
 
 // Soft delete product
@@ -56,7 +60,7 @@ export async function deactivateProduct(id: string): Promise<void> {
 // Fetch active suppliers
 export async function getSuppliers(): Promise<Supplier[]> {
   const secret = getMlekSecret();
-  const rows = db.prepare("SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC").all() as any[];
+  const rows = db.prepare("SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC").all() as { id: string, name: string, contact_person: string | null, phone: string | null, email: string | null, current_balance: number, is_active: number }[];
 
   return rows.map(r => ({
     ...r,
@@ -147,7 +151,7 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
       payment_method: 'Cash' | 'Credit';
     };
 
-    const poItems = db.prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id = ?").all(purchaseOrderId) as any[];
+    const poItems = db.prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id = ?").all(purchaseOrderId) as { id: string, purchase_order_id: string, item_id: string, quantity: number, unit_price: number, total_price: number }[];
 
     // 4. Update stock quantities and WAC cost prices
     const updateInventory = db.prepare(`

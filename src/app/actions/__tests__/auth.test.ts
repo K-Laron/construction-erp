@@ -59,6 +59,8 @@ describe('Auth Actions', () => {
     }
 
     const invalidPayload = { ...payload, overridePin: 'wrong' };
-    await expect(processCheckout(invalidPayload)).rejects.toThrow(/Invalid Manager Override PIN/);
+    const res = await processCheckout(invalidPayload);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/Invalid Manager Override PIN/);
   });
 });

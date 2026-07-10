@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { processCheckout, processReturn } from '../transactions';
 import crypto from 'crypto';
 import db from '@/lib/db';
@@ -25,7 +25,8 @@ describe('Transaction Server Actions', () => {
 
     // Note: since unitPrice is 2000 but the DB has whatever price, it will likely hit PRICE_TAMPERING_DETECTED first,
     // or if the item doesn't exist, it hits "not found".
-    await expect(processCheckout(fakePayload)).rejects.toThrow();
+    const res = await processCheckout(fakePayload);
+    expect(res.success).toBe(false);
   });
 
   it('rejects tampered unit prices (C1 fix)', async () => {
@@ -48,7 +49,9 @@ describe('Transaction Server Actions', () => {
     };
 
     // Client sent unitPrice=500 but DB says selling_price=1000
-    await expect(processCheckout(payload)).rejects.toThrow(/PRICE_TAMPERING_DETECTED/);
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/PRICE_TAMPERING_DETECTED/);
   });
 
   it('recalculates tax server-side (C2 fix)', async () => {
@@ -70,7 +73,7 @@ describe('Transaction Server Actions', () => {
       paymentMethod: 'Cash' as const
     };
 
-    const { transactionId } = await processCheckout(payload);
+    const { data: { transactionId } } = (await processCheckout(payload)) as { data: { transactionId: string } };
     const tx = db.prepare("SELECT tax FROM transactions WHERE id = ?").get(transactionId) as { tax: number };
     
     // Server should have recalculated tax: (1120 / 1.12) * 0.12 = 120
@@ -104,7 +107,7 @@ describe('Transaction Server Actions', () => {
       paymentMethod: 'Cash' as const
     };
 
-    const { transactionId } = await processCheckout(payload);
+    const { data: { transactionId } } = (await processCheckout(payload)) as { data: { transactionId: string } };
 
     // Verify GL entries for sale
     const journalLine = db.prepare(`SELECT SUM(amount) as total FROM journal_lines WHERE account_id = 'acc-vat-payable' AND type = 'CREDIT'`).get() as { total: number };
@@ -148,7 +151,7 @@ describe('Transaction Server Actions', () => {
       paymentMethod: 'Cash' as const
     };
 
-    const { transactionId } = await processCheckout(payload);
+    const { data: { transactionId } } = (await processCheckout(payload)) as { data: { transactionId: string } };
     const tx = db.prepare("SELECT tax FROM transactions WHERE id = ?").get(transactionId) as { tax: number };
     
     // Server should have set tax to 0 because customer is VAT exempt
@@ -177,7 +180,7 @@ describe('Transaction Server Actions', () => {
       paymentMethod: 'Credit' as const
     };
 
-    const { transactionId } = await processCheckout(payload);
+    const { data: { transactionId } } = (await processCheckout(payload)) as { data: { transactionId: string } };
     
     // Customer balance should be 1000
     const cust1 = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };

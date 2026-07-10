@@ -24,6 +24,7 @@ describe('Deliveries API', () => {
 
     setMlekSecret(crypto.randomBytes(32));
 
+    // @ts-expect-error: mlekHex might be undefined if getMlekSecret returns something unexpected
     const mlekHex = getMlekSecret().toString('hex');
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES ('user_1', 'admin', 'Admin', 'Admin', 'hash', 'salt', 1, 0)`).run();
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES ('system-daemon', 'daemon', 'Daemon', 'Admin', 'hash', 'salt', 1, 1)`).run();
@@ -49,7 +50,7 @@ describe('Deliveries API', () => {
   });
 
   it('successfully dispatches a delivery with valid quantities', async () => {
-    const deliveryId = await dispatchDelivery(transactionId, 'John Doe', 'ABC-1234', [
+    const { data: deliveryId } = await dispatchDelivery(transactionId, 'John Doe', 'ABC-1234', [
       { itemId, quantityDelivered: 2000 }
     ]);
     expect(deliveryId).toBeDefined();
@@ -62,8 +63,10 @@ describe('Deliveries API', () => {
   });
 
   it('rejects dispatching more than remaining quantity', async () => {
-    await expect(dispatchDelivery(transactionId, 'John Doe', 'ABC-1234', [
+    const res = await dispatchDelivery(transactionId, 'John Doe', 'ABC-1234', [
       { itemId, quantityDelivered: 6000 }
-    ])).rejects.toThrow(/DISPATCH_EXCEEDS_REMAINING/);
+    ]);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/DISPATCH_EXCEEDS_REMAINING/);
   });
 });

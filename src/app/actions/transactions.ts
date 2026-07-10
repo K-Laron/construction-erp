@@ -58,14 +58,16 @@ export const CheckoutPayloadSchema = z.object({
 
 
 // Main checkout action
-export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ transactionId: string; siNumber: number | null; orNumber: number | null }> {
+export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ success: boolean; data?: { transactionId: string; siNumber: number | null; orNumber: number | null }; error?: string }> {
+  try {
   checkMlek();
 
   const payload = CheckoutPayloadSchema.parse(rawPayload);
-  let {
-    customerId, items, subtotal, tax,
+  const {
+    customerId, items, subtotal,
     deliveryFee, discount, totalAmount, amountPaid, paymentMethod
   } = payload;
+  let { tax } = payload;
   
   const cashierId = await getActiveUserId();
 
@@ -149,7 +151,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
   let siNumber: number | null = null;
   let orNumber: number | null = null;
 
-  db.transaction(() => {
+  const result = db.transaction(() => {
     // 1. Insert transaction header
     db.prepare(`
       INSERT INTO transactions (id, customer_id, cashier_id, date, subtotal, tax, delivery_fee, discount, total_amount, amount_paid, balance_due, payment_status, payment_method, delivery_status)
@@ -187,7 +189,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     }
 
     // 3. Retrieve assigned doc numbers from trigger
-    const txRow = db.prepare("SELECT sales_invoice_number, official_receipt_number FROM transactions WHERE id = ?").get(transactionId) as any;
+    const txRow = db.prepare("SELECT sales_invoice_number, official_receipt_number FROM transactions WHERE id = ?").get(transactionId) as { sales_invoice_number?: number; official_receipt_number?: number } | undefined;
     siNumber = txRow?.sales_invoice_number || null;
     orNumber = txRow?.official_receipt_number || null;
 
@@ -256,9 +258,14 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     if (totalDebits === totalCredits && totalDebits > 0) {
       createBalancedJournalEntry(`POS Sale: ${transactionId.slice(0, 8)}`, glLines, cashierId);
     }
+
+    return { transactionId, siNumber, orNumber };
   })();
 
-  return { transactionId, siNumber, orNumber };
+  return { success: true, data: result };
+} catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Checkout failed' };
+  }
 }
 
 // Fetch all transactions for a date range
@@ -294,7 +301,8 @@ export async function getTransactionDetails(transactionId: string): Promise<{ tr
 export async function processReturn(
   transactionId: string,
   itemsToReturn: { itemId: string; quantity: number }[]
-): Promise<void> {
+): Promise<{ success: boolean; data?: void; error?: string }> {
+  try {
   getMlekSecret(); // Ensure unlocked
   const processedBy = await getActiveUserId();
 
@@ -403,4 +411,9 @@ export async function processReturn(
       VALUES (?, CURRENT_TIMESTAMP, ?, 'SALE_RETURN', ?, NULL, ?)
     `).run(crypto.randomUUID(), processedBy, transactionId, `Returned ${itemsToReturn.length} line items`);
   })();
+
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Return failed' };
+  }
 }

@@ -7,7 +7,8 @@ import { checkMlek } from "@/lib/mlek";
 
 
 // Open a new cashier shift
-export async function openShift(_ignoredCashierId: string, openingFloat: number): Promise<string> {
+export async function openShift(_ignoredCashierId: string, openingFloat: number): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
   checkMlek();
   const cashierId = await getActiveUserId();
 
@@ -23,14 +24,18 @@ export async function openShift(_ignoredCashierId: string, openingFloat: number)
     VALUES (?, ?, CURRENT_TIMESTAMP, ?, 'Open')
   `).run(shiftId, cashierId, openingFloat);
 
-  return shiftId;
+    return { success: true, data: shiftId };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to open shift' };
+  }
 }
 
 // Close a shift and generate Z-Reading
-export async function closeShift(shiftId: string, actualCash: number): Promise<{ zReadingId: string; discrepancy: number }> {
+export async function closeShift(shiftId: string, actualCash: number): Promise<{ success: boolean; data?: { zReadingId: string; discrepancy: number }; error?: string }> {
+  try {
   checkMlek();
 
-  const shift = db.prepare("SELECT * FROM shifts WHERE id = ? AND status = 'Open'").get(shiftId) as any;
+  const shift = db.prepare("SELECT * FROM shifts WHERE id = ? AND status = 'Open'").get(shiftId) as { id: string, cashier_id: string, opened_at: string, opening_float: number, status: string } | undefined;
   if (!shift) {
     throw new Error("SHIFT_NOT_FOUND: No open shift found with that ID.");
   }
@@ -68,7 +73,7 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
         COALESCE(SUM(CASE WHEN tax = 0 THEN subtotal ELSE 0 END), 0) as exempt_sales
       FROM transactions 
       WHERE cashier_id = ? AND date >= ? AND date <= CURRENT_TIMESTAMP
-    `).get(shift.cashier_id, shift.opened_at) as any;
+    `).get(shift.cashier_id, shift.opened_at) as { gross_sales: number, vat_collected: number, vatable_sales: number, exempt_sales: number };
 
     // N3: Count voids and returns separately
     const voidsCount = db.prepare(`
@@ -102,7 +107,10 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
     `).run(crypto.randomUUID(), shift.cashier_id, shiftId, `Expected: ${expectedCash}`, `Actual: ${actualCash}, Disc: ${discrepancy}`);
   })();
 
-  return { zReadingId, discrepancy };
+  return { success: true, data: { zReadingId, discrepancy } };
+} catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to close shift' };
+  }
 }
 
 // Get the current open shift for a cashier

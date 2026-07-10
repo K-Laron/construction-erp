@@ -37,12 +37,15 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
       const sellingCentavos = parsePesoCentavos(sellingPriceStr);
       const wholesaleCentavos = parsePesoCentavos(wholesalePriceStr);
 
-      await createProduct(
+      const result = await createProduct(
         name, category, unit,
         stockQtyMillicounts, costCentavos,
         sellingCentavos, wholesaleCentavos,
         reorderLevelMillicounts
       );
+      if (!result.success) throw new Error(result.error);
+      if (!result.success) throw new Error(result.error);
+
       onSuccess();
       onClose();
       // Reset form

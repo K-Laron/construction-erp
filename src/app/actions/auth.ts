@@ -22,7 +22,7 @@ export async function checkManagerRole(): Promise<string> {
 }
 
 // Authenticate user via PIN
-export async function authenticateUser(username: string, pin: string, ipAddress: string = '127.0.0.1'): Promise<{ success: boolean; user?: any; error?: string }> {
+export async function authenticateUser(username: string, pin: string, ipAddress: string = '127.0.0.1'): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
   const timeframe5Min = Date.now() - 300000;
   const timeframe15Min = Date.now() - 900000;
 
@@ -47,7 +47,7 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
       return { success: false, error: "Account temporarily locked. Try again in 15 minutes." };
     }
 
-    const user = db.prepare("SELECT * FROM users WHERE username = ? AND is_active = 1 AND is_system = 0").get(username) as any;
+    const user = db.prepare("SELECT * FROM users WHERE username = ? AND is_active = 1 AND is_system = 0").get(username) as { id: string; username: string; name: string; role: string; passcode_hash: string; passcode_salt: string; } | undefined;
 
     if (!user) {
       db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 0)`)
@@ -63,8 +63,8 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
   });
 
   const preCheck = authPreCheck();
-  if (!preCheck.success) {
-    return preCheck;
+  if (!preCheck.success || !preCheck.user) {
+    return { success: false, error: preCheck.error || "Unknown error" };
   }
 
   const user = preCheck.user;
@@ -121,8 +121,8 @@ export async function createUser(
 }
 
 // Get all active users
-export async function getUsers(): Promise<any[]> {
-  return db.prepare("SELECT id, username, name, role, is_active FROM users WHERE is_system = 0 ORDER BY name ASC").all();
+export async function getUsers(): Promise<{ id: string; username: string; name: string; role: string; is_active: number }[]> {
+  return db.prepare("SELECT id, username, name, role, is_active FROM users WHERE is_system = 0 ORDER BY name ASC").all() as { id: string; username: string; name: string; role: string; is_active: number; }[];
 }
 
 // Update cost price (Manager/Admin + MLEK required)

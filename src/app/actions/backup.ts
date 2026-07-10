@@ -43,8 +43,8 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
       data: finalPayload.toString('base64'),
       filename: `backup_${new Date().toISOString().slice(0, 10)}.enc`
     };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
     // Clean up unencrypted file immediately, regardless of cipher success/failure
     try {
@@ -58,14 +58,14 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
 }
 
 // Get the night backup logs from the system audit log
-export async function getBackupLogs(): Promise<any[]> {
+export async function getBackupLogs(): Promise<{ id: string; timestamp: string; action_type: string }[]> {
   const secret = getMlekSecret();
   if (!secret) return [];
   
   return db.prepare(`
     SELECT * FROM system_audit_logs 
     WHERE action_type = 'BACKUP_CRON' 
-    ORDER BY timestamp DESC 
-    LIMIT 10
-  `).all();
+    ORDER BY timestamp DESC
+    LIMIT 30
+  `).all() as { id: string; timestamp: string; action_type: string; }[];
 }

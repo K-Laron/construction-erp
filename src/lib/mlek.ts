@@ -1,17 +1,17 @@
 export function getMlekSecret(): Buffer {
-  const secret = (global as any).mlekSecret;
+  const secret = (global as { __mlekSecret?: Buffer | null }).__mlekSecret;
   if (!secret) throw new Error("DATABASE_LOCKED: Store is locked.");
   return secret;
 }
 
 export function checkMlek(): void {
-  if (!(global as any).mlekSecret) throw new Error("DATABASE_LOCKED: Store is locked.");
+  if (!(global as { __mlekSecret?: Buffer | null }).__mlekSecret) throw new Error("DATABASE_LOCKED: Store is locked.");
 }
 
 export function setMlekSecret(secret: Buffer | null): void {
-  (global as any).mlekSecret = secret;
+  (global as { __mlekSecret?: Buffer | null }).__mlekSecret = secret;
 }
 
 export function isMlekUnlocked(): boolean {
-  return !!(global as any).mlekSecret;
+  return !!(global as { __mlekSecret?: Buffer | null }).__mlekSecret;
 }

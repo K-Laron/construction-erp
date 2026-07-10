@@ -13,10 +13,10 @@ if (!sessionPassword) {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('SESSION_PASSWORD environment variable is required in production.');
   } else {
-    sessionPassword = (global as any).__DEV_SESSION_PASSWORD;
+    sessionPassword = (global as { __sessionPassword?: string }).__sessionPassword;
     if (!sessionPassword) {
       sessionPassword = crypto.randomBytes(32).toString('hex');
-      (global as any).__DEV_SESSION_PASSWORD = sessionPassword;
+      (global as { __sessionPassword?: string }).__sessionPassword = sessionPassword;
     }
   }
 }

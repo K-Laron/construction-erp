@@ -9,7 +9,9 @@ describe('Shift Actions', () => {
     const userId = crypto.randomUUID();
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES (?, 'cashier1', 'Cashier', 'Cashier', 'hash', 'salt', 1, 0)`).run(userId);
 
-    const shiftId = await openShift(userId, 5000); // 5000 centavos float
+    const openRes = await openShift(userId, 5000); // 5000 centavos float
+    if (!openRes.success) throw new Error("OPEN_FAILED: " + openRes.error);
+    const shiftId = openRes.data;
 
     // Mock some sales using transactions manually
     const transactionId = crypto.randomUUID();
@@ -17,7 +19,9 @@ describe('Shift Actions', () => {
       VALUES (?, 'system-daemon', CURRENT_TIMESTAMP, 1000, 100, 1100, 1100, 'Paid', 'Cash', 'N/A')`).run(transactionId);
     
     // Expected cash: 5000 + 1100 = 6100.
-    const { discrepancy } = await closeShift(shiftId, 6000);
+    const res = await closeShift(shiftId, 6000);
+    if (!res.success) throw new Error(res.error);
+    const { discrepancy } = res.data!;
 
     expect(discrepancy).toBe(-100); // 6000 actual - 6100 expected
   });

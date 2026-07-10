@@ -7,7 +7,7 @@ import { checkMlek } from "@/lib/mlek";
 
 
 // Fetch pending deliveries
-export async function getPendingDeliveries(): Promise<any[]> {
+export async function getPendingDeliveries(): Promise<{ transaction_id: string, date: string, delivery_status: string, customer_name: string | null, customer_id: string | null, total_amount: number }[]> {
   checkMlek();
   return db.prepare(`
     SELECT t.id as transaction_id, t.date, t.delivery_status,
@@ -17,11 +17,11 @@ export async function getPendingDeliveries(): Promise<any[]> {
     LEFT JOIN customers c ON t.customer_id = c.id
     WHERE t.delivery_status IN ('Pending', 'Partially Delivered')
     ORDER BY t.date ASC
-  `).all();
+  `).all() as { transaction_id: string; date: string; delivery_status: string; customer_name: string | null; customer_id: string | null; total_amount: number; }[];
 }
 
 // Fetch items remaining for a transaction
-export async function getDeliveryRemainingItems(transactionId: string): Promise<any[]> {
+export async function getDeliveryRemainingItems(transactionId: string): Promise<{ item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[]> {
   checkMlek();
 
   return db.prepare(`
@@ -41,7 +41,7 @@ export async function getDeliveryRemainingItems(transactionId: string): Promise<
     SELECT *, ordered_qty - delivered_qty as remaining_qty
     FROM cte
     WHERE (ordered_qty - delivered_qty) > 0
-  `).all(transactionId, transactionId);
+  `).all(transactionId, transactionId) as { item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[];
 }
 
 // Dispatch a delivery trip
@@ -51,7 +51,8 @@ export async function dispatchDelivery(
   truckPlate: string,
   items: { itemId: string; quantityDelivered: number }[], // millicounts
   helperWorkerIds: string[] = []
-): Promise<string> {
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
   checkMlek();
   const userId = await getActiveUserId();
 
@@ -110,7 +111,7 @@ export async function dispatchDelivery(
     }
 
     // 4. Check if transaction is fully delivered
-    const remaining = db.prepare(`
+    const remainingAfter = db.prepare(`
       WITH item_remaining AS (
         SELECT 
           ti.item_id,
@@ -123,9 +124,9 @@ export async function dispatchDelivery(
         WHERE ti.transaction_id = ?
       )
       SELECT * FROM item_remaining WHERE remaining_qty > 0
-    `).all(transactionId, transactionId);
+    `).all(transactionId, transactionId) as { item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[];
 
-    const newStatus = remaining.length === 0 ? 'Fully Delivered' : 'Partially Delivered';
+    const newStatus = remainingAfter.length === 0 ? 'Fully Delivered' : 'Partially Delivered';
     db.prepare("UPDATE transactions SET delivery_status = ? WHERE id = ?").run(newStatus, transactionId);
 
     // 5. Audit log
@@ -135,7 +136,10 @@ export async function dispatchDelivery(
     `).run(crypto.randomUUID(), userId, deliveryId, `Driver: ${driverName}, Plate: ${truckPlate}, Items: ${items.length}`);
   })();
 
-  return deliveryId;
+    return { success: true, data: deliveryId };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to dispatch' };
+  }
 }
 
 // Confirm delivery completion
@@ -145,11 +149,11 @@ export async function confirmDelivery(deliveryId: string): Promise<void> {
 }
 
 // Get delivery history for a transaction
-export async function getDeliveryHistory(transactionId: string): Promise<any[]> {
+export async function getDeliveryHistory(transactionId: string): Promise<{ id: string, transaction_id: string, delivery_date: string, driver_name: string, truck_plate: string, status: string, items: { id: string; delivery_id: string; item_id: string; quantity_delivered: number; item_name: string; unit: string }[] }[]> {
   checkMlek();
   const deliveries = db.prepare(`
     SELECT * FROM deliveries WHERE transaction_id = ? ORDER BY delivery_date DESC
-  `).all(transactionId) as any[];
+  `).all(transactionId) as { id: string, transaction_id: string, delivery_date: string, driver_name: string, truck_plate: string, status: string }[];
 
   if (deliveries.length === 0) return [];
 
@@ -161,9 +165,9 @@ export async function getDeliveryHistory(transactionId: string): Promise<any[]> 
     FROM delivery_items di
     JOIN inventory i ON di.item_id = i.id
     WHERE di.delivery_id IN (${placeholders})
-  `).all(...deliveryIds) as any[];
+  `).all(...deliveryIds) as { id: string, delivery_id: string, item_id: string, quantity_delivered: number, item_name: string, unit: string }[];
 
-  const itemsByDelivery = allItems.reduce((acc, item) => {
+  const itemsByDelivery = allItems.reduce((acc: Record<string, { id: string; delivery_id: string; item_id: string; quantity_delivered: number; item_name: string; unit: string }[]>, item) => {
     if (!acc[item.delivery_id]) acc[item.delivery_id] = [];
     acc[item.delivery_id].push(item);
     return acc;

@@ -1,7 +1,6 @@
 "use server";
 
 import db from '@/lib/db';
-import crypto from 'crypto';
 import { Worker } from 'worker_threads';
 import path from 'path';
 import { checkMlek } from "@/lib/mlek";
@@ -10,9 +9,9 @@ import { checkMlek } from "@/lib/mlek";
 
 
 // Fetch all G/L accounts
-export async function getTrialBalance(): Promise<any[]> {
+export async function getTrialBalance(): Promise<{ id: string; code: string; name: string; category: string; balance: number }[]> {
   checkMlek();
-  return db.prepare("SELECT * FROM accounts ORDER BY code ASC").all();
+  return db.prepare("SELECT * FROM accounts ORDER BY code ASC").all() as { id: string; code: string; name: string; category: string; balance: number }[];
 }
 
 // Daily G/L Integrity Scan: asserts that all entries are balanced
@@ -24,7 +23,7 @@ export async function runDailyGLScan(): Promise<{ isCorrupt: boolean; corruptEnt
     FROM journal_lines
     GROUP BY journal_entry_id
     HAVING diff != 0
-  `).all() as any[];
+  `).all() as { journal_entry_id: string, diff: number }[];
 
   if (rows.length > 0) {
     const ids = rows.map(r => r.journal_entry_id);
@@ -41,7 +40,7 @@ const REPORT_QUERIES: Record<string, string> = {
 };
 
 // Offload heavy queries to read-only worker threads to prevent main loop blocks
-export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COLLECTIONS', params: any[] = []): Promise<any[]> {
+export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COLLECTIONS', params: any[] = []): Promise<{ total: number }[]> {
   checkMlek();
   
   const query = REPORT_QUERIES[reportType];
@@ -51,7 +50,7 @@ export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COL
 
   // M5 Fix: Skip worker thread if running on an in-memory database (tests)
   if ((db as any).memory) {
-    return db.prepare(query).all(...params);
+    return db.prepare(query).all(...params) as { total: number }[];
   }
 
   return new Promise((resolve, reject) => {
