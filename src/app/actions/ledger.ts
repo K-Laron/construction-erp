@@ -4,7 +4,7 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { Worker } from 'worker_threads';
 import path from 'path';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { checkMlek } from "@/lib/mlek";
 
 
 

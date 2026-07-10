@@ -1,5 +1,5 @@
 import db, { runMigrations } from '@/lib/db';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getMlekSecret, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 let initialized = false;
 
@@ -10,7 +10,7 @@ export async function initializeDatabase() {
     // Run SQL migrations on startup (JS migrations need MLEK, deferred until unlock)
     await runMigrations();
     initialized = true;
-    console.log('[DB] Database initialized with WAL mode and migrations applied.');
+    if (process.env.NODE_ENV !== 'production') console.log('[DB] Database initialized with WAL mode and migrations applied.');
   } catch (error) {
     console.error('[DB] Failed to initialize database:', error);
     throw error;
@@ -39,5 +39,5 @@ export function lockStore(): void {
     secret.fill(0);
   }
   setMlekSecret(null);
-  console.log('[DB] Store locked. MLEK cleared from process memory.');
+  if (process.env.NODE_ENV !== 'production') console.log('[DB] Store locked. MLEK cleared from process memory.');
 }

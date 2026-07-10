@@ -3,7 +3,7 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId } from './auth';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { checkMlek } from "@/lib/mlek";
 
 
 // Open a new cashier shift

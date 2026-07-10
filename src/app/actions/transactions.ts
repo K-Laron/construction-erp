@@ -7,7 +7,7 @@ import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry, JournalLineInput } from '@/lib/ledger_helpers';
 import { z } from 'zod';
 import { getActiveUserId } from './auth';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getMlekSecret, checkMlek } from "@/lib/mlek";
 
 export interface CartItem {
   itemId: string;

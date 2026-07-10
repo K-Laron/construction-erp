@@ -4,7 +4,8 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
+import os from 'os';
 
 export async function exportEncryptedBackup(): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
   const secret = getMlekSecret();
@@ -12,7 +13,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     return { success: false, error: "Store is locked." };
   }
 
-  const tempBackupPath = path.resolve(process.cwd(), 'data/backup_temp.db');
+  const tempBackupPath = path.join(os.tmpdir(), `backup_temp_${crypto.randomUUID()}.db`);
   
   try {
     if (fs.existsSync(tempBackupPath)) fs.unlinkSync(tempBackupPath);
@@ -46,8 +47,12 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     return { success: false, error: err.message };
   } finally {
     // Clean up unencrypted file immediately, regardless of cipher success/failure
-    if (fs.existsSync(tempBackupPath)) {
-      fs.unlinkSync(tempBackupPath);
+    try {
+      if (fs.existsSync(tempBackupPath)) {
+        fs.unlinkSync(tempBackupPath);
+      }
+    } catch (cleanupErr) {
+      console.error(`CRITICAL: Failed to clean up unencrypted temporary backup at ${tempBackupPath}`, cleanupErr);
     }
   }
 }

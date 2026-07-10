@@ -26,42 +26,56 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
   const timeframe5Min = Date.now() - 300000;
   const timeframe15Min = Date.now() - 900000;
 
-  // IP Lockout
-  const ipFails = db.prepare(`
-    SELECT COUNT(*) as count FROM login_attempts WHERE attempt_type = 'PIN' AND ip_address = ? AND is_successful = 0 AND timestamp > ?
-  `).get(ipAddress, timeframe5Min) as { count: number };
+  const attemptId = crypto.randomUUID();
 
-  if (ipFails.count >= 3) {
-    return { success: false, error: "IP temporarily locked. Try again in 5 minutes." };
-  }
+  const authPreCheck = db.transaction(() => {
+    // IP Lockout
+    const ipFails = db.prepare(`
+      SELECT COUNT(*) as count FROM login_attempts WHERE attempt_type = 'PIN' AND ip_address = ? AND is_successful = 0 AND timestamp > ?
+    `).get(ipAddress, timeframe5Min) as { count: number };
 
-  // Account lockout
-  const acctFails = db.prepare(`
-    SELECT COUNT(*) as count FROM login_attempts WHERE attempt_type = 'PIN' AND username = ? AND is_successful = 0 AND timestamp > ?
-  `).get(username, timeframe15Min) as { count: number };
+    if (ipFails.count >= 3) {
+      return { success: false, error: "IP temporarily locked. Try again in 5 minutes." };
+    }
 
-  if (acctFails.count >= 5) {
-    return { success: false, error: "Account temporarily locked. Try again in 15 minutes." };
-  }
+    // Account lockout
+    const acctFails = db.prepare(`
+      SELECT COUNT(*) as count FROM login_attempts WHERE attempt_type = 'PIN' AND username = ? AND is_successful = 0 AND timestamp > ?
+    `).get(username, timeframe15Min) as { count: number };
 
-  const user = db.prepare("SELECT * FROM users WHERE username = ? AND is_active = 1 AND is_system = 0").get(username) as any;
+    if (acctFails.count >= 5) {
+      return { success: false, error: "Account temporarily locked. Try again in 15 minutes." };
+    }
 
-  if (!user) {
+    const user = db.prepare("SELECT * FROM users WHERE username = ? AND is_active = 1 AND is_system = 0").get(username) as any;
+
+    if (!user) {
+      db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 0)`)
+        .run(attemptId, username, ipAddress, Date.now());
+      return { success: false, error: "Invalid username or PIN." };
+    }
+
+    // Pessimistically log a failure to prevent concurrent bypass during slow hashing
     db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 0)`)
-      .run(crypto.randomUUID(), username, ipAddress, Date.now());
-    return { success: false, error: "Invalid username or PIN." };
+      .run(attemptId, username, ipAddress, Date.now());
+
+    return { success: true, user };
+  });
+
+  const preCheck = authPreCheck();
+  if (!preCheck.success) {
+    return preCheck;
   }
 
+  const user = preCheck.user;
   const pinHash = crypto.pbkdf2Sync(pin, user.passcode_salt, 600000, 32, 'sha512').toString('hex');
 
   if (pinHash !== user.passcode_hash) {
-    db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 0)`)
-      .run(crypto.randomUUID(), username, ipAddress, Date.now());
     return { success: false, error: "Invalid username or PIN." };
   }
 
-  db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 1)`)
-    .run(crypto.randomUUID(), username, ipAddress, Date.now());
+  // Update the optimistic failure to a success
+  db.prepare("UPDATE login_attempts SET is_successful = 1 WHERE id = ?").run(attemptId);
 
   const session = await getSession();
   session.userId = user.id;

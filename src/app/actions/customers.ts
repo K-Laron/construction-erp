@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { getActiveUserId } from './auth';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
 
 // Removed local getMlekSecret
 // Fetch all active customers

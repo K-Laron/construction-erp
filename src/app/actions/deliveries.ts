@@ -3,7 +3,7 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId } from './auth';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { checkMlek } from "@/lib/mlek";
 
 
 // Fetch pending deliveries
@@ -57,17 +57,32 @@ export async function dispatchDelivery(
 
   const deliveryId = crypto.randomUUID();
 
-  // M2: Validate remaining quantity before dispatching
-  const remaining = await getDeliveryRemainingItems(transactionId);
-  for (const item of items) {
-    const rem = remaining.find(r => r.item_id === item.itemId);
-    if (!rem) throw new Error(`Item ${item.itemId} is not part of this transaction.`);
-    if (item.quantityDelivered > rem.remaining_qty) {
-      throw new Error(`DISPATCH_EXCEEDS_REMAINING: Item ${item.itemId} remaining is ${rem.remaining_qty}, but trying to dispatch ${item.quantityDelivered}.`);
-    }
-  }
-
   db.transaction(() => {
+    // M2, M3: Validate remaining quantity before dispatching INSIDE transaction
+    const remaining = db.prepare(`
+      WITH cte AS (
+        SELECT 
+          ti.item_id, ti.quantity as ordered_qty,
+          COALESCE(
+            (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
+             JOIN deliveries d ON di.delivery_id = d.id 
+             WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
+          ) as delivered_qty
+        FROM transaction_items ti
+        WHERE ti.transaction_id = ?
+      )
+      SELECT *, ordered_qty - delivered_qty as remaining_qty
+      FROM cte
+      WHERE (ordered_qty - delivered_qty) > 0
+    `).all(transactionId, transactionId) as { item_id: string; remaining_qty: number }[];
+
+    for (const item of items) {
+      const rem = remaining.find(r => r.item_id === item.itemId);
+      if (!rem) throw new Error(`Item ${item.itemId} is not part of this transaction or fully delivered.`);
+      if (item.quantityDelivered > rem.remaining_qty) {
+        throw new Error(`DISPATCH_EXCEEDS_REMAINING: Item ${item.itemId} remaining is ${rem.remaining_qty}, but trying to dispatch ${item.quantityDelivered}.`);
+      }
+    }
     // 1. Create delivery record
     db.prepare(`
       INSERT INTO deliveries (id, transaction_id, delivery_date, driver_name, truck_plate, status)

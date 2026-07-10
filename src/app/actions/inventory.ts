@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { getActiveUserId } from './auth';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
 
 // Fetch active inventory (values in millicounts/centavos)
 export async function getInventory(): Promise<InventoryItem[]> {

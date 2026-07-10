@@ -18,6 +18,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
   const [loading, setLoading] = useState(false);
   const [setupSuccess, setSetupSuccess] = useState(false);
   const [generatedMnemonic, setGeneratedMnemonic] = useState<string[]>([]);
+  const [generatedAdminPin, setGeneratedAdminPin] = useState<string>('');
 
   const handleUnlock = async () => {
     setError('');
@@ -53,6 +54,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
 
       if (result.success) {
         setGeneratedMnemonic(words);
+        setGeneratedAdminPin(result.adminPin || '123456');
         setSetupSuccess(true);
       } else {
         setError(result.error || 'Setup failed.');
@@ -114,7 +116,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
           </div>
 
           <p className="text-slate-500 text-xs mb-4">
-            Default admin account: <span className="text-interactive-600 font-mono">admin</span> / PIN: <span className="text-interactive-600 font-mono">123456</span>
+            Default admin account: <span className="text-interactive-600 font-mono">admin</span> / PIN: <span className="text-interactive-600 font-mono font-bold text-lg">{generatedAdminPin}</span>
           </p>
 
           <button

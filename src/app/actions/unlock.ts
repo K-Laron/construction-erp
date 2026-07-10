@@ -3,7 +3,7 @@
 import db, { runMigrations } from '@/lib/db';
 import { deriveKey, encryptField, decryptField } from '@/lib/crypto';
 import crypto from 'crypto';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 
 export interface UnlockResult {
   success: boolean;
@@ -72,10 +72,10 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
       insertConfig.run('dop_salt', dopSalt);
       insertConfig.run('mmp_salt', mmpSalt);
 
-      // Seed default admin user (username: admin, PIN: 123456 stretched)
+      // Seed default admin user (username: admin, PIN: 6-digit random)
       const adminSalt = crypto.randomBytes(16).toString('hex');
-      // PIN 123456 pbkdf2 hash
-      const adminHash = crypto.pbkdf2Sync('123456', adminSalt, 600000, 32, 'sha512').toString('hex');
+      const adminPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
+      const adminHash = crypto.pbkdf2Sync(adminPin, adminSalt, 600000, 32, 'sha512').toString('hex');
 
       db.prepare(`
         INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system)
@@ -86,7 +86,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
     // Load MLEK into process memory
     setMlekSecret(mlek);
 
-    return { success: true };
+    return { success: true, adminPin };
   } catch (err: any) {
     return { success: false, error: err.message };
   }

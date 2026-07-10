@@ -1,6 +1,6 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { checkMlek } from "@/lib/mlek";
 
 export interface JournalLineInput {
   accountId: string;

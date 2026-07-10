@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 const dbDir = path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(dbDir)) {
@@ -45,7 +46,7 @@ export async function runMigrations(mlekSecret?: string) {
         db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, CURRENT_TIMESTAMP)").run(version);
       });
       runSql();
-      console.log(`Successfully applied SQL migration: ${file}`);
+      if (process.env.NODE_ENV !== 'production') console.log(`Successfully applied SQL migration: ${file}`);
     } else if (ext === '.js' || ext === '.ts') {
       if (!mlekSecret) {
         console.warn(`[Migrations] Programmatic migration ${file} requires unlocked MLEK. Skipping.`);
@@ -55,14 +56,14 @@ export async function runMigrations(mlekSecret?: string) {
       // Run the JS/TS module migration function using manual transaction boundary for async support
       db.prepare('BEGIN').run();
       try {
-        // @ts-ignore
+        // @ts-expect-error dynamic require for migrations
         const requireFunc = typeof __webpack_require__ === "function" ? __non_webpack_require__ : require;
         const migration = requireFunc(migrationPath);
         const migrateFn = typeof migration === 'function' ? migration : migration.default;
         await migrateFn(db, mlekSecret);
         db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, CURRENT_TIMESTAMP)").run(version);
         db.prepare('COMMIT').run();
-        console.log(`Successfully applied programmatic JS migration: ${file}`);
+        if (process.env.NODE_ENV !== 'production') console.log(`Successfully applied programmatic JS migration: ${file}`);
       } catch (err) {
         db.prepare('ROLLBACK').run();
         console.error(`Failed to apply programmatic JS migration ${file}:`, err);
@@ -87,8 +88,8 @@ function seedSystemData() {
     'SYSTEM', 
     'SYSTEM Daemon', 
     'Admin', 
-    '0000000000000000000000000000000000000000000000000000000000000000', 
-    '0000000000000000', 
+    crypto.randomBytes(32).toString('hex'), 
+    crypto.randomBytes(8).toString('hex'), 
     1, 
     1
   );
