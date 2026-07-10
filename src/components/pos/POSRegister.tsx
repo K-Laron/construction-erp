@@ -59,7 +59,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
 
     if (existing) {
       setCart(cart.map(c => c.itemId === item.id 
-        ? { ...c, quantity: c.quantity + addedQty, totalPrice: ((c.quantity + addedQty) * c.unitPrice) / 1000 } 
+        ? { ...c, quantity: c.quantity + addedQty, totalPrice: Math.round(((c.quantity + addedQty) * c.unitPrice) / 1000) } 
         : c
       ));
     } else {

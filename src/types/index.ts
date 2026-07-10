@@ -197,6 +197,7 @@ export interface Shift {
   closed_at: string | null;
   opening_float: number;
   closing_cash_actual: number | null;
+  z_reading_id: string | null;
   status: 'Open' | 'Closed';
 }
 
