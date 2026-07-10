@@ -26,7 +26,7 @@ const DeactivateCustomerSchema = z.object({
 // Removed local getMlekSecret
 // Fetch all active customers
 export async function getCustomers(): Promise<Customer[]> {
-  const secret = getMlekSecret();
+  const secret = getMlekSecret(false);
   const rows = db.prepare("SELECT * FROM customers WHERE is_active = 1 ORDER BY name ASC").all() as Customer[];
 
   return rows.map(r => ({
@@ -86,7 +86,7 @@ export async function deactivateCustomer(customerId: string): Promise<{ success:
 
 // Retrieve customer ledger and check HMAC signature validity
 export async function getCustomerLedger(customerId: string): Promise<{ ledger: CustomerLedgerEntry[]; isIntegrityViolated: boolean }> {
-  getMlekSecret(); // Ensure unlocked
+  getMlekSecret(false); // Ensure unlocked
   const rows = db.prepare("SELECT * FROM customer_ledger WHERE customer_id = ? ORDER BY date ASC").all(customerId) as CustomerLedgerEntry[];
 
   let prevSig = "GENESIS";

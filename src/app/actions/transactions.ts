@@ -278,7 +278,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
 
 // Fetch all transactions for a date range
 export async function getTransactions(startDate?: string, endDate?: string): Promise<Transaction[]> {
-  checkMlek();
+  checkMlek(false);
   let query = "SELECT * FROM transactions";
   const params: string[] = [];
 
@@ -293,7 +293,7 @@ export async function getTransactions(startDate?: string, endDate?: string): Pro
 
 // Fetch transaction details with items
 export async function getTransactionDetails(transactionId: string): Promise<{ transaction: Transaction; items: (TransactionItem & { item_name: string; item_unit: string })[] }> {
-  getMlekSecret(); // Ensure unlocked
+  getMlekSecret(false); // Ensure unlocked
   const transaction = db.prepare("SELECT * FROM transactions WHERE id = ?").get(transactionId) as Transaction;
   const items = db.prepare(`
     SELECT ti.*, i.name as item_name, i.unit as item_unit

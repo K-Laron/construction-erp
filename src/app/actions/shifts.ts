@@ -80,8 +80,8 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
       SELECT 
         COALESCE(SUM(total_amount), 0) as gross_sales,
         COALESCE(SUM(tax), 0) as vat_collected,
-        COALESCE(SUM(CASE WHEN tax > 0 THEN subtotal - tax ELSE 0 END), 0) as vatable_sales,
-        COALESCE(SUM(CASE WHEN tax = 0 THEN subtotal ELSE 0 END), 0) as exempt_sales
+        COALESCE(SUM(CASE WHEN tax > 0 THEN (subtotal - discount) - tax ELSE 0 END), 0) as vatable_sales,
+        COALESCE(SUM(CASE WHEN tax = 0 THEN subtotal - discount ELSE 0 END), 0) as exempt_sales
       FROM transactions 
       WHERE cashier_id = ? AND date >= ? AND date <= CURRENT_TIMESTAMP
     `).get(shift.cashier_id, shift.opened_at) as { gross_sales: number, vat_collected: number, vatable_sales: number, exempt_sales: number };

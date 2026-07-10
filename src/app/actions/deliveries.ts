@@ -20,7 +20,7 @@ const DispatchDeliverySchema = z.object({
 
 // Fetch pending deliveries
 export async function getPendingDeliveries(): Promise<{ transaction_id: string, date: string, delivery_status: string, customer_name: string | null, customer_id: string | null, total_amount: number }[]> {
-  checkMlek();
+  checkMlek(false);
   return db.prepare(`
     SELECT t.id as transaction_id, t.date, t.delivery_status,
            c.name as customer_name, c.id as customer_id,
@@ -34,7 +34,7 @@ export async function getPendingDeliveries(): Promise<{ transaction_id: string, 
 
 // Fetch items remaining for a transaction
 export async function getDeliveryRemainingItems(transactionId: string): Promise<{ item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[]> {
-  checkMlek();
+  checkMlek(false);
 
   return db.prepare(`
     WITH cte AS (

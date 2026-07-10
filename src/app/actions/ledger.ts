@@ -7,13 +7,13 @@ import { checkMlek } from "@/lib/mlek";
 
 // Fetch all G/L accounts
 export async function getTrialBalance(): Promise<{ id: string; code: string; name: string; category: string; balance: number }[]> {
-  checkMlek();
+  checkMlek(false);
   return db.prepare("SELECT * FROM accounts ORDER BY code ASC").all() as { id: string; code: string; name: string; category: string; balance: number }[];
 }
 
 // Daily G/L Integrity Scan: asserts that all entries are balanced
 export async function runDailyGLScan(): Promise<{ isCorrupt: boolean; corruptEntries: string[] }> {
-  checkMlek();
+  checkMlek(false);
   const rows = db.prepare(`
     SELECT journal_entry_id, 
            SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE -amount END) as diff
@@ -38,7 +38,7 @@ const REPORT_QUERIES: Record<string, string> = {
 
 // Offload heavy queries to read-only worker threads to prevent main loop blocks
 export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COLLECTIONS', params: any[] = []): Promise<{ total: number }[]> {
-  checkMlek();
+  checkMlek(false);
   
   const query = REPORT_QUERIES[reportType];
   if (!query) {

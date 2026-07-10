@@ -30,7 +30,7 @@ const CreateSupplierSchema = z.object({
 
 // Fetch active inventory (values in millicounts/centavos)
 export async function getInventory(): Promise<InventoryItem[]> {
-  getMlekSecret(); // Ensure unlocked
+  getMlekSecret(false); // Ensure unlocked
   return db.prepare("SELECT * FROM inventory WHERE is_active = 1 ORDER BY name ASC").all() as InventoryItem[];
 }
 
@@ -99,7 +99,7 @@ export async function deactivateProduct(id: string): Promise<{ success: boolean;
 
 // Fetch active suppliers
 export async function getSuppliers(): Promise<Supplier[]> {
-  const secret = getMlekSecret();
+  const secret = getMlekSecret(false);
   const rows = db.prepare("SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC").all() as { id: string, name: string, contact_person: string | null, phone: string | null, email: string | null, current_balance: number, is_active: number }[];
 
   return rows.map(r => ({
@@ -300,14 +300,14 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
 
 // Retrieve supplier ledger and check HMAC signature validity
 export async function getSupplierLedger(supplierId: string): Promise<{ ledger: SupplierLedgerEntry[]; isIntegrityViolated: boolean }> {
-  getMlekSecret(); // Ensure unlocked
+  getMlekSecret(false); // Ensure unlocked
   const rows = db.prepare("SELECT * FROM supplier_ledger WHERE supplier_id = ? ORDER BY date ASC").all(supplierId) as SupplierLedgerEntry[];
 
   let prevSig = "GENESIS";
   let isIntegrityViolated = false;
 
   for (const entry of rows) {
-    const expectedSig = calculateHMACSignature(entry, prevSig, getMlekSecret());
+    const expectedSig = calculateHMACSignature(entry, prevSig, getMlekSecret(false));
     if (entry.hmac_signature !== expectedSig) {
       isIntegrityViolated = true;
     }

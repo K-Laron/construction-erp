@@ -23,8 +23,8 @@ export function getMlekSecret(updateActivity = true): Buffer {
   return secret;
 }
 
-export function checkMlek(): void {
-  getMlekSecret(true);
+export function checkMlek(updateActivity = true): void {
+  getMlekSecret(updateActivity);
 }
 
 export function setMlekSecret(secret: Buffer | null): void {

@@ -8,6 +8,7 @@ import os from 'os';
 import Database from 'better-sqlite3';
 import { getMlekSecret } from "@/lib/mlek";
 import { logger } from '@/lib/logger';
+import { headers } from 'next/headers';
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 300000; // 5 min
@@ -37,19 +38,28 @@ function verifyBackupIntegrity(filePath: string): boolean {
   }
 }
 
-export async function exportEncryptedBackup(): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
-  const secret = getMlekSecret();
+export async function exportEncryptedBackup(providedIp?: string): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
+  const secret = getMlekSecret(false);
   if (!secret) {
     return { success: false, error: "Store is locked." };
   }
 
-  // ponytail: rate limit by IP — production should use an external store
-  const ip = 'global'; // simplified since server actions lack request context
-  if (!checkRateLimit(ip)) {
+  let ipAddress = providedIp;
+  if (!ipAddress) {
+    try {
+      const h = await headers();
+      ipAddress = h.get('x-forwarded-for') || '127.0.0.1';
+    } catch {
+      ipAddress = '127.0.0.1';
+    }
+  }
+
+  if (!checkRateLimit(ipAddress)) {
     return { success: false, error: "Rate limit exceeded. Try again in 5 minutes." };
   }
 
   const tempBackupPath = path.join(os.tmpdir(), `backup_temp_${crypto.randomUUID()}.db`);
+  let fd: number | null = null;
 
   try {
     if (fs.existsSync(tempBackupPath)) fs.unlinkSync(tempBackupPath);
@@ -66,7 +76,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     const cipher = crypto.createCipheriv('aes-256-gcm', backupKey, iv);
 
     const CHUNK_SIZE = 65536;
-    const fd = fs.openSync(tempBackupPath, 'r');
+    fd = fs.openSync(tempBackupPath, 'r');
     const encryptedChunks: Buffer[] = [];
     let buffer = Buffer.alloc(CHUNK_SIZE);
     let bytesRead: number | null = null;
@@ -78,6 +88,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     }
 
     fs.closeSync(fd);
+    fd = null;
     encryptedChunks.push(cipher.final());
     const tag = cipher.getAuthTag();
 
@@ -91,6 +102,11 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {}
+    }
     try {
       if (fs.existsSync(tempBackupPath)) {
         fs.unlinkSync(tempBackupPath);
