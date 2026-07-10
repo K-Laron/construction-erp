@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PaymentModal from '../PaymentModal';
+import type { Customer } from '@/types';
 
 vi.mock('@/app/actions/customers', () => ({
   recordPayment: vi.fn()
@@ -20,7 +21,7 @@ describe('PaymentModal', () => {
         isOpen={true} 
         onClose={mockOnClose} 
         onSuccess={mockOnSuccess}
-        customer={{ id: 'c1', name: 'John Doe', current_balance: 1000 } as any}
+        customer={{ id: 'c1', name: 'John Doe', current_balance: 1000 } as unknown as Customer}
       />
     );
     

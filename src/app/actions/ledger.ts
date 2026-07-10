@@ -5,9 +5,6 @@ import { Worker } from 'worker_threads';
 import path from 'path';
 import { checkMlek } from "@/lib/mlek";
 
-
-
-
 // Fetch all G/L accounts
 export async function getTrialBalance(): Promise<{ id: string; code: string; name: string; category: string; balance: number }[]> {
   checkMlek();
@@ -49,13 +46,13 @@ export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COL
   }
 
   // M5 Fix: Skip worker thread if running on an in-memory database (tests)
-  if ((db as any).memory) {
+  if (db.memory) {
     return db.prepare(query).all(...params) as { total: number }[];
   }
 
   return new Promise((resolve, reject) => {
     const worker = new Worker(path.resolve(process.cwd(), 'src/lib/workers/reportQuery.js'), {
-      workerData: { query, params, dbPath: (db as any).name }
+      workerData: { query, params, dbPath: db.name }
     });
     
     worker.on('message', (msg) => {

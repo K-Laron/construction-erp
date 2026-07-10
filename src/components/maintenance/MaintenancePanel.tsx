@@ -279,7 +279,7 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
                 <div className="grid grid-cols-2 gap-3">
                   <select
                     value={role}
-                    onChange={e => setRole(e.target.value as any)}
+                    onChange={e => setRole(e.target.value as 'Cashier' | 'Manager' | 'Admin')}
                     className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
                   >
                     <option value="Cashier">Cashier</option>

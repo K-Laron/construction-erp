@@ -14,8 +14,9 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Database    | SQLite via better-sqlite3, WAL mode |
 | Styling     | Tailwind CSS v4                     |
 | Icons       | Lucide React                        |
-| Testing     | Vitest                              |
-| Offline     | PWA (manifest.json + sw.js)         |
+| Testing     | Vitest (10 suites, 20 tests)        |
+| Logging     | Structured logger (level-filtered)  |
+| Health      | `/api/health` endpoint              |
 
 ## Features
 
@@ -34,6 +35,8 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 - **High-contrast daylight readability** — Minimal Bento-box UI optimized for outdoor/warehouse environments
 - **A5 landscape print engine** — Receipt generation for thermal and standard printers
 - **Structured error handling** — All server actions return `{ success, data, error }`; `ErrorBoundary` component for UI crash isolation
+- **Health monitoring** — `/api/health` endpoint with DB, MLEK, migration, and shift checks
+- **Graceful shutdown** — SIGTERM/SIGINT handler ensures clean DB closure
 
 ## Security
 
@@ -61,6 +64,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 
 ```
 src/
+├── app/api/            # 1 API route (health)
 ├── app/actions/        # 10 server actions
 │   ├── auth            # Authentication & rate limiting
 │   ├── backup          # Encrypted backup/restore
@@ -73,13 +77,14 @@ src/
 │   ├── transactions    # POS transactions
 │   └── unlock          # Bootstrap & PIN management
 │
-├── lib/                # 9 shared libraries
+├── lib/                # 10 shared libraries
 │   ├── crypto          # AES-256-GCM encryption
 │   ├── db              # SQLite connection (WAL mode)
 │   ├── format          # Number & currency formatting
 │   ├── init            # Database initialization
 │   ├── ledger_crypto   # HMAC-SHA256 chaining
 │   ├── ledger_helpers  # Ledger utilities
+│   ├── logger          # Structured logger
 │   ├── mlek            # Master Ledger Encryption Key
 │   ├── session         # iron-session management
 │   └── utils           # General utilities

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
 
 const dbDir = path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(dbDir)) {
@@ -46,10 +47,10 @@ export async function runMigrations(mlekSecret?: string) {
         db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, CURRENT_TIMESTAMP)").run(version);
       });
       runSql();
-      if (process.env.NODE_ENV !== 'production') console.log(`Successfully applied SQL migration: ${file}`);
+      logger.info(`Successfully applied SQL migration: ${file}`);
     } else if (ext === '.js' || ext === '.ts') {
       if (!mlekSecret) {
-        console.warn(`[Migrations] Programmatic migration ${file} requires unlocked MLEK. Skipping.`);
+        logger.warn(`Programmatic migration ${file} requires unlocked MLEK. Skipping.`);
         continue;
       }
       const migrationPath = path.join(migrationsDir, file);
@@ -63,10 +64,10 @@ export async function runMigrations(mlekSecret?: string) {
         await migrateFn(db, mlekSecret);
         db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, CURRENT_TIMESTAMP)").run(version);
         db.prepare('COMMIT').run();
-        if (process.env.NODE_ENV !== 'production') console.log(`Successfully applied programmatic JS migration: ${file}`);
+        logger.info(`Successfully applied programmatic JS migration: ${file}`);
       } catch (err) {
         db.prepare('ROLLBACK').run();
-        console.error(`Failed to apply programmatic JS migration ${file}:`, err);
+        logger.error(`Failed to apply programmatic JS migration ${file}:`, err);
         throw err;
       }
     }
@@ -129,6 +130,16 @@ function seedSystemData() {
     insertItem.run('item-rebar', 'Deformed Rebar 10mm', 'Steel', 'pc', 400000, 12000, 15000, 13500, 50000);  // 400 pcs
   }
 }
+
+// Graceful shutdown: close DB on SIGTERM/SIGINT
+function shutdown(signal: string) {
+  logger.info(`Received ${signal}. Closing database...`);
+  try { db.close(); } catch { /* already closed */ }
+  logger.info('Database closed. Goodbye.');
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default db;
 export { dbPath };

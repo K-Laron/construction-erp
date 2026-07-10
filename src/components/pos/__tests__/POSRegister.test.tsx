@@ -17,25 +17,24 @@ import { getCustomers } from '@/app/actions/customers';
 import { getCurrentShift } from '@/app/actions/shifts';
 
 describe('POSRegister', () => {
+  const mockOnCheckoutSuccess = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
-    // @ts-expect-error mock
-    getInventory.mockResolvedValue([
+    (getInventory as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: '1', name: 'Cement', category: 'Masonry', selling_price: 200, unit: 'bag', stock_quantity: 100, cost_price: 150 }
     ]);
-    // @ts-expect-error mock
-    getCustomers.mockResolvedValue([
+    (getCustomers as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'c1', name: 'John Doe', price_tier: 'Retail' }
     ]);
-    // @ts-expect-error mock
-    getCurrentShift.mockResolvedValue({
+    (getCurrentShift as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: 'shift_1',
       cashier_id: 'user_1'
     });
   });
 
   it('renders correctly and loads inventory', async () => {
-    render(<POSRegister />);
+    render(<POSRegister cashierId="user_1" onCheckoutSuccess={mockOnCheckoutSuccess} />);
     
     await waitFor(() => {
       expect(screen.getByText('Cement')).toBeTruthy();

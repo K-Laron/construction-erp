@@ -65,7 +65,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
     const encryptedDop = encryptField(mlekHex, dopKey);
     const encryptedMmp = encryptField(mlekHex, mmpKey);
 
-    let adminPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
+    let adminPin = '';
 
     db.transaction(() => {
       // Save config

@@ -89,7 +89,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
         throw new Error(result.error);
       }
       setSuccessData(result.data!);
-      onSuccess({ ...result.data!, payload } as any);
+      onSuccess({ transactionId: result.data!.transactionId, siNumber: result.data!.siNumber, orNumber: result.data!.orNumber, payload });
     } catch (err: any) {
       setError(err.message || 'Checkout failed.');
     }
@@ -158,7 +158,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
                     key={method.id}
                     type="button"
                     onClick={() => {
-                      setPaymentMethod(method.id as any);
+                      setPaymentMethod(method.id as 'Cash' | 'Credit' | 'Check');
                       if (method.id === 'Credit') {
                         setAmountPaidStr('0');
                       } else {

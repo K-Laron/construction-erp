@@ -4,7 +4,7 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { Transaction, TransactionItem } from '@/types';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
-import { createBalancedJournalEntry, JournalLineInput } from '@/lib/ledger_helpers';
+import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { z } from 'zod';
 import { getActiveUserId } from './auth';
 import { getMlekSecret, checkMlek } from "@/lib/mlek";

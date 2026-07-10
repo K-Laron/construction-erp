@@ -23,7 +23,7 @@ describe('Inventory Actions', () => {
     ]);
     await receiveGoods(poId, 'test-user');
 
-    const updatedItem = db.prepare(`SELECT stock_quantity, cost_price FROM inventory WHERE id = ?`).get(itemId) as any;
+    const updatedItem = db.prepare(`SELECT stock_quantity, cost_price FROM inventory WHERE id = ?`).get(itemId) as { stock_quantity: number; cost_price: number };
     expect(updatedItem.stock_quantity).toBe(30000); // 10000 + 20000
     expect(updatedItem.cost_price).toBe(1400); // WAC updated
   });

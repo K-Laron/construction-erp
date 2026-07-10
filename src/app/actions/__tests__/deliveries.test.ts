@@ -24,8 +24,6 @@ describe('Deliveries API', () => {
 
     setMlekSecret(crypto.randomBytes(32));
 
-    // @ts-expect-error: mlekHex might be undefined if getMlekSecret returns something unexpected
-    const mlekHex = getMlekSecret().toString('hex');
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES ('user_1', 'admin', 'Admin', 'Admin', 'hash', 'salt', 1, 0)`).run();
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES ('system-daemon', 'daemon', 'Daemon', 'Admin', 'hash', 'salt', 1, 1)`).run();
     db.prepare(`INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status) VALUES ('shift_1', 'user_1', CURRENT_TIMESTAMP, 0, 'Open')`).run();

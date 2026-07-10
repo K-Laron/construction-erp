@@ -3,7 +3,7 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getSession } from '@/lib/session';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { checkMlek } from "@/lib/mlek";
 
 
 export async function getActiveUserId(): Promise<string> {

@@ -109,7 +109,7 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
             <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Price Tier</label>
             <select
               value={priceTier}
-              onChange={e => setPriceTier(e.target.value as any)}
+              onChange={e => setPriceTier(e.target.value as 'Retail' | 'Wholesale')}
               className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
             >
               <option value="Retail">Retail</option>

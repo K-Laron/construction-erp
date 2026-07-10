@@ -13,14 +13,14 @@ describe('CheckoutModal', () => {
   const mockOnClose = vi.fn();
   const mockOnSuccess = vi.fn();
   const mockCartItems = [
-    { itemId: '1', itemName: 'Cement', quantity: 2, unitPrice: 200, unitCost: 150, totalPrice: 400 }
+    { itemId: '1', name: 'Cement', quantity: 2, unitUsed: 'bag', unitPrice: 200, unitCost: 150, totalPrice: 400 }
   ];
   const mockTotals = {
     subtotal: 400,
     tax: 48,
     deliveryFee: 0,
     discount: 0,
-    total: 448
+    totalAmount: 448
   };
 
   beforeEach(() => {
@@ -36,7 +36,6 @@ describe('CheckoutModal', () => {
         cartItems={mockCartItems}
         totals={mockTotals}
         cashierId="user_1"
-        customerId={null}
       />
     );
     expect(screen.getByText('Cash')).toBeTruthy();
@@ -44,8 +43,7 @@ describe('CheckoutModal', () => {
   });
 
   it('submits checkout successfully', async () => {
-    // @ts-expect-error mock processCheckout
-    processCheckout.mockResolvedValue({
+    (processCheckout as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       data: { transactionId: 'tx123', siNumber: 1, orNumber: 1 }
     });
@@ -58,7 +56,6 @@ describe('CheckoutModal', () => {
         cartItems={mockCartItems}
         totals={mockTotals}
         cashierId="user_1"
-        customerId={null}
       />
     );
 

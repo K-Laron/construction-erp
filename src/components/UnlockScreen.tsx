@@ -54,7 +54,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
 
       if (result.success) {
         setGeneratedMnemonic(words);
-        setGeneratedAdminPin(result.adminPin || '123456');
+        setGeneratedAdminPin(result.adminPin ?? '');
         setSetupSuccess(true);
       } else {
         setError(result.error || 'Setup failed.');
