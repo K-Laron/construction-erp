@@ -15,7 +15,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
 | Fonts       | Fira Sans (body), Fira Code (heading/mono)
-| Testing     | Vitest (11 suites, 29 tests)        |
+| Testing     | Vitest (12 suites, 33 tests)        |
 | Logging     | Structured logger (JSON, level-filtered)  |
 | Health      | `/api/health` endpoint              |
 
@@ -115,22 +115,23 @@ src/
 
 ## Testing
 
-**11 test suites · 29 tests · all passing · tsc --noEmit clean**
+**12 test suites · 33 tests · all passing · tsc --noEmit clean**
 
 All tests run against in-memory SQLite with the full migration suite applied. Worker threads gracefully fall back to inline queries for in-memory databases.
 
-### Server Action Tests (8 suites)
+### Server Action Tests (9 suites)
 
-| Suite                  | Coverage                                               |
-| ---------------------- | ------------------------------------------------------ |
-| `auth`                 | Rate limiting, PBKDF2 PIN override                     |
-| `inventory`            | Weighted Average Cost recalculation                    |
-| `ledger`               | HMAC integrity verification                            |
-| `shifts`               | Z-reading reconciliation                               |
-| `transactions`         | Price tampering, tax recalc, credit returns, VAT-exempt, cancellations |
-| `unlock`               | Bootstrap flow, DOP validation                         |
-| `deliveries`           | Dispatch validation                                    |
-| `production_hardening` | MLEK inactivity auto-lock, Zod validation boundaries, backup integrity dry-run |
+| Suite                     | Coverage                                               |
+| ------------------------- | ------------------------------------------------------ |
+| `auth`                    | Rate limiting, PBKDF2 PIN override                     |
+| `inventory`               | Weighted Average Cost recalculation                    |
+| `ledger`                  | HMAC integrity verification                            |
+| `shifts`                  | Z-reading reconciliation                               |
+| `transactions`            | Price tampering, tax recalc, credit returns, VAT-exempt, cancellations |
+| `unlock`                  | Bootstrap flow, DOP validation                         |
+| `deliveries`              | Dispatch validation                                    |
+| `production_hardening`    | MLEK inactivity auto-lock, Zod validation boundaries, backup integrity dry-run |
+| `production_hardening_v2` | Targeted overrides, passive check timer tests, backup restore validation |
 
 ### Component Tests (3 suites)
 
