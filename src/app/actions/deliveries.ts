@@ -4,6 +4,18 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId } from './auth';
 import { checkMlek } from "@/lib/mlek";
+import { z } from 'zod';
+
+const DispatchDeliverySchema = z.object({
+  transactionId: z.string().uuid(),
+  driverName: z.string().min(1, "Driver name is required"),
+  truckPlate: z.string().min(1, "Truck plate is required"),
+  items: z.array(z.object({
+    itemId: z.string().uuid(),
+    quantityDelivered: z.number().int().positive()
+  })).min(1),
+  helperWorkerIds: z.array(z.string().uuid()).default([])
+});
 
 
 // Fetch pending deliveries
@@ -53,88 +65,95 @@ export async function dispatchDelivery(
   helperWorkerIds: string[] = []
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-  checkMlek();
-  const userId = await getActiveUserId();
+    const parsed = DispatchDeliverySchema.parse({
+      transactionId,
+      driverName,
+      truckPlate,
+      items,
+      helperWorkerIds
+    });
+    checkMlek();
+    const userId = await getActiveUserId();
 
-  const deliveryId = crypto.randomUUID();
+    const deliveryId = crypto.randomUUID();
 
-  db.transaction(() => {
-    // M2, M3: Validate remaining quantity before dispatching INSIDE transaction
-    const remaining = db.prepare(`
-      WITH cte AS (
-        SELECT 
-          ti.item_id, ti.quantity as ordered_qty,
-          COALESCE(
-            (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
-             JOIN deliveries d ON di.delivery_id = d.id 
-             WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
-          ) as delivered_qty
-        FROM transaction_items ti
-        WHERE ti.transaction_id = ?
-      )
-      SELECT *, ordered_qty - delivered_qty as remaining_qty
-      FROM cte
-      WHERE (ordered_qty - delivered_qty) > 0
-    `).all(transactionId, transactionId) as { item_id: string; remaining_qty: number }[];
+    db.transaction(() => {
+      // M2, M3: Validate remaining quantity before dispatching INSIDE transaction
+      const remaining = db.prepare(`
+        WITH cte AS (
+          SELECT 
+            ti.item_id, ti.quantity as ordered_qty,
+            COALESCE(
+              (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
+               JOIN deliveries d ON di.delivery_id = d.id 
+               WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
+            ) as delivered_qty
+          FROM transaction_items ti
+          WHERE ti.transaction_id = ?
+        )
+        SELECT *, ordered_qty - delivered_qty as remaining_qty
+        FROM cte
+        WHERE (ordered_qty - delivered_qty) > 0
+      `).all(parsed.transactionId, parsed.transactionId) as { item_id: string; remaining_qty: number }[];
 
-    for (const item of items) {
-      const rem = remaining.find(r => r.item_id === item.itemId);
-      if (!rem) throw new Error(`Item ${item.itemId} is not part of this transaction or fully delivered.`);
-      if (item.quantityDelivered > rem.remaining_qty) {
-        throw new Error(`DISPATCH_EXCEEDS_REMAINING: Item ${item.itemId} remaining is ${rem.remaining_qty}, but trying to dispatch ${item.quantityDelivered}.`);
+      for (const item of parsed.items) {
+        const rem = remaining.find(r => r.item_id === item.itemId);
+        if (!rem) throw new Error(`Item ${item.itemId} is not part of this transaction or fully delivered.`);
+        if (item.quantityDelivered > rem.remaining_qty) {
+          throw new Error(`DISPATCH_EXCEEDS_REMAINING: Item ${item.itemId} remaining is ${rem.remaining_qty}, but trying to dispatch ${item.quantityDelivered}.`);
+        }
       }
-    }
-    // 1. Create delivery record
-    db.prepare(`
-      INSERT INTO deliveries (id, transaction_id, delivery_date, driver_name, truck_plate, status)
-      VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, 'Dispatched')
-    `).run(deliveryId, transactionId, driverName, truckPlate);
+      // 1. Create delivery record
+      db.prepare(`
+        INSERT INTO deliveries (id, transaction_id, delivery_date, driver_name, truck_plate, status)
+        VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, 'Dispatched')
+      `).run(deliveryId, parsed.transactionId, parsed.driverName, parsed.truckPlate);
 
-    // 2. Insert delivery items
-    const insertItem = db.prepare(`
-      INSERT INTO delivery_items (id, delivery_id, item_id, quantity_delivered)
-      VALUES (?, ?, ?, ?)
-    `);
-
-    for (const item of items) {
-      insertItem.run(crypto.randomUUID(), deliveryId, item.itemId, item.quantityDelivered);
-    }
-
-    // 3. Assign helpers
-    if (helperWorkerIds.length > 0) {
-      const insertHelper = db.prepare(`
-        INSERT INTO delivery_helpers (id, delivery_id, worker_id) VALUES (?, ?, ?)
+      // 2. Insert delivery items
+      const insertItem = db.prepare(`
+        INSERT INTO delivery_items (id, delivery_id, item_id, quantity_delivered)
+        VALUES (?, ?, ?, ?)
       `);
-      for (const workerId of helperWorkerIds) {
-        insertHelper.run(crypto.randomUUID(), deliveryId, workerId);
+
+      for (const item of parsed.items) {
+        insertItem.run(crypto.randomUUID(), deliveryId, item.itemId, item.quantityDelivered);
       }
-    }
 
-    // 4. Check if transaction is fully delivered
-    const remainingAfter = db.prepare(`
-      WITH item_remaining AS (
-        SELECT 
-          ti.item_id,
-          ti.quantity - COALESCE(
-            (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
-             JOIN deliveries d ON di.delivery_id = d.id 
-             WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
-          ) as remaining_qty
-        FROM transaction_items ti
-        WHERE ti.transaction_id = ?
-      )
-      SELECT * FROM item_remaining WHERE remaining_qty > 0
-    `).all(transactionId, transactionId) as { item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[];
+      // 3. Assign helpers
+      if (parsed.helperWorkerIds.length > 0) {
+        const insertHelper = db.prepare(`
+          INSERT INTO delivery_helpers (id, delivery_id, worker_id) VALUES (?, ?, ?)
+        `);
+        for (const workerId of parsed.helperWorkerIds) {
+          insertHelper.run(crypto.randomUUID(), deliveryId, workerId);
+        }
+      }
 
-    const newStatus = remainingAfter.length === 0 ? 'Fully Delivered' : 'Partially Delivered';
-    db.prepare("UPDATE transactions SET delivery_status = ? WHERE id = ?").run(newStatus, transactionId);
+      // 4. Check if transaction is fully delivered
+      const remainingAfter = db.prepare(`
+        WITH item_remaining AS (
+          SELECT 
+            ti.item_id,
+            ti.quantity - COALESCE(
+              (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
+               JOIN deliveries d ON di.delivery_id = d.id 
+               WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
+            ) as remaining_qty
+          FROM transaction_items ti
+          WHERE ti.transaction_id = ?
+        )
+        SELECT * FROM item_remaining WHERE remaining_qty > 0
+      `).all(parsed.transactionId, parsed.transactionId) as { item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[];
 
-    // 5. Audit log
-    db.prepare(`
-      INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
-    `).run(crypto.randomUUID(), userId, deliveryId, `Driver: ${driverName}, Plate: ${truckPlate}, Items: ${items.length}`);
-  })();
+      const newStatus = remainingAfter.length === 0 ? 'Fully Delivered' : 'Partially Delivered';
+      db.prepare("UPDATE transactions SET delivery_status = ? WHERE id = ?").run(newStatus, parsed.transactionId);
+
+      // 5. Audit log
+      db.prepare(`
+        INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+        VALUES (?, CURRENT_TIMESTAMP, ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
+      `).run(crypto.randomUUID(), userId, deliveryId, `Driver: ${parsed.driverName}, Plate: ${parsed.truckPlate}, Items: ${parsed.items.length}`);
+    })();
 
     return { success: true, data: deliveryId };
   } catch (err: unknown) {

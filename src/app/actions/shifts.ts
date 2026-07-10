@@ -4,25 +4,35 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId } from './auth';
 import { checkMlek } from "@/lib/mlek";
+import { z } from 'zod';
 
+const OpenShiftSchema = z.object({
+  openingFloat: z.number().int().nonnegative()
+});
+
+const CloseShiftSchema = z.object({
+  shiftId: z.string().uuid(),
+  actualCash: z.number().int().nonnegative()
+});
 
 // Open a new cashier shift
 export async function openShift(_ignoredCashierId: string, openingFloat: number): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-  checkMlek();
-  const cashierId = await getActiveUserId();
+    const parsed = OpenShiftSchema.parse({ openingFloat });
+    checkMlek();
+    const cashierId = await getActiveUserId();
 
-  // Only one open shift per cashier
-  const existing = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) as { id: string } | undefined;
-  if (existing) {
-    throw new Error("SHIFT_ALREADY_OPEN: Close the current shift before opening a new one.");
-  }
+    // Only one open shift per cashier
+    const existing = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) as { id: string } | undefined;
+    if (existing) {
+      throw new Error("SHIFT_ALREADY_OPEN: Close the current shift before opening a new one.");
+    }
 
-  const shiftId = crypto.randomUUID();
-  db.prepare(`
-    INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status)
-    VALUES (?, ?, CURRENT_TIMESTAMP, ?, 'Open')
-  `).run(shiftId, cashierId, openingFloat);
+    const shiftId = crypto.randomUUID();
+    db.prepare(`
+      INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status)
+      VALUES (?, ?, CURRENT_TIMESTAMP, ?, 'Open')
+    `).run(shiftId, cashierId, parsed.openingFloat);
 
     return { success: true, data: shiftId };
   } catch (err: unknown) {
@@ -33,16 +43,17 @@ export async function openShift(_ignoredCashierId: string, openingFloat: number)
 // Close a shift and generate Z-Reading
 export async function closeShift(shiftId: string, actualCash: number): Promise<{ success: boolean; data?: { zReadingId: string; discrepancy: number }; error?: string }> {
   try {
-  checkMlek();
+    const parsed = CloseShiftSchema.parse({ shiftId, actualCash });
+    checkMlek();
 
-  const shift = db.prepare("SELECT * FROM shifts WHERE id = ? AND status = 'Open'").get(shiftId) as { id: string, cashier_id: string, opened_at: string, opening_float: number, status: string } | undefined;
-  if (!shift) {
-    throw new Error("SHIFT_NOT_FOUND: No open shift found with that ID.");
-  }
+    const shift = db.prepare("SELECT * FROM shifts WHERE id = ? AND status = 'Open'").get(parsed.shiftId) as { id: string, cashier_id: string, opened_at: string, opening_float: number, status: string } | undefined;
+    if (!shift) {
+      throw new Error("SHIFT_NOT_FOUND: No open shift found with that ID.");
+    }
 
-  const cashSales = db.prepare(`
-    SELECT COALESCE(SUM(amount_paid), 0) as total
-    FROM transactions
+    const cashSales = db.prepare(`
+      SELECT COALESCE(SUM(amount_paid), 0) as total
+      FROM transactions
     WHERE cashier_id = ? AND payment_method = 'Cash' AND date >= ? AND date <= CURRENT_TIMESTAMP
   `).get(shift.cashier_id, shift.opened_at) as { total: number };
 
@@ -53,7 +64,7 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
   `).get(shift.cashier_id, shift.opened_at) as { total: number };
 
   const expectedCash = shift.opening_float + cashSales.total + collections.total;
-  const discrepancy = actualCash - expectedCash;
+  const discrepancy = parsed.actualCash - expectedCash;
   const zReadingId = crypto.randomUUID();
 
   db.transaction(() => {
@@ -61,7 +72,7 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
     db.prepare(`
       UPDATE shifts SET closed_at = CURRENT_TIMESTAMP, closing_cash_actual = ?, status = 'Closed', z_reading_id = ?
       WHERE id = ?
-    `).run(actualCash, zReadingId, shiftId);
+    `).run(parsed.actualCash, zReadingId, parsed.shiftId);
 
     // 2. Compute Z-Reading aggregates
     // Transactions during this shift (between start_time and now, by this cashier)

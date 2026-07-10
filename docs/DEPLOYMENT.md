@@ -280,8 +280,12 @@ Some migrations require access to decrypted data (e.g., re-encrypting fields und
 | **Server-side price & tax validation** | All pricing and tax calculations are authoritative on the server; client values are never trusted |
 | **Structured error handling** | Application errors use typed error classes — no raw `throw` of strings or unstructured objects |
 | **UI crash isolation** | React `ErrorBoundary` wraps each view, preventing a component crash from taking down the entire interface |
-| **Session security** | `HttpOnly`, `Secure`, `SameSite=Lax` cookies with automatic expiry and rotation |
+| **Session security** | `HttpOnly`, `Secure`, `SameSite=Lax` cookies with automatic expiry and rotation (TTL: 8 hours) |
 | **Role-based access control** | Server Actions enforce RBAC checks (Admin, Manager, Cashier) before executing privileged operations |
+| **Inactivity Auto-Lock** | MLEK automatically zero-filled and evicted from server process memory after 30 minutes of inactivity |
+| **Backup Integrity Verification** | Every backup checkpoint is verified using `PRAGMA integrity_check` prior to GCM encryption |
+| **Zod Input Boundaries** | Mutating Server Actions strictly validate all parameters against schemas before database transactions |
+| **Structured JSON Logging** | Production logging outputs single-line JSON with dynamic request context `x-trace-id` trace correlation |
 
 ---
 

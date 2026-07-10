@@ -18,10 +18,13 @@ describe('Inventory Actions', () => {
     // New WAC = ((10 * 1000) + (20 * 1600)) / 30 = (10000 + 32000) / 30 = 42000 / 30 = 1400.
     // Stock quantity is millicounts, so 10 = 10000, 20 = 20000.
     // processPO takes standard units.
-    const poId = await createPurchaseOrder(supplierId, 'Cash', [
+    const poRes = await createPurchaseOrder(supplierId, 'Cash', [
       { itemId, qtyMillicounts: 20000, unitPriceCentavos: 1600 }
     ]);
-    await receiveGoods(poId, 'test-user');
+    expect(poRes.success).toBe(true);
+    const poId = poRes.data!;
+    const receiveRes = await receiveGoods(poId, 'test-user');
+    expect(receiveRes.success).toBe(true);
 
     const updatedItem = db.prepare(`SELECT stock_quantity, cost_price FROM inventory WHERE id = ?`).get(itemId) as { stock_quantity: number; cost_price: number };
     expect(updatedItem.stock_quantity).toBe(30000); // 10000 + 20000

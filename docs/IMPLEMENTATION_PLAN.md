@@ -445,12 +445,40 @@ node scratch/verify-all-modules.js
 
 ---
 
-## Current Project Health (as of Phase 13)
-- **Test Suites:** 10 (7 server action + 3 component)
-- **Tests:** 20, all passing
+---
+
+### Phase 14: Production Readiness Hardening (Completed)
+
+#### Task 14.1: Production-Grade JSON Logging
+- Configured logger to output single-line JSON log strings in production mode.
+- Dynamically extracts correlation trace IDs from Next.js headers when inside request execution context.
+- Status: ✅ Complete
+
+#### Task 14.2: Backup Integrity Dry-Run Verification
+- Added post-checkpoint integrity checks inside `exportEncryptedBackup` using a temporary connection to run `PRAGMA integrity_check` on the database backup copy.
+- Status: ✅ Complete
+
+#### Task 14.3: Cryptographic Memory Lifecycle & Inactivity Auto-Lock
+- Added an inactivity auto-lock timer that zero-fills and purges the MLEK from server memory after 30 minutes.
+- Excluded status polling checks from resetting the timer.
+- Status: ✅ Complete
+
+#### Task 14.4: Mutating Server Action Validation Boundaries
+- Wrapped customer, product, supplier, purchase order, delivery, and shift actions with strict Zod validation schemas.
+- Status: ✅ Complete
+
+#### Task 14.5: Hardening Verification Suite
+- Created `production_hardening.test.ts` testing the inactivity lock, healthy backups, and validation boundary failures.
+- Status: ✅ Complete
+
+---
+
+## Current Project Health (as of Phase 14)
+- **Test Suites:** 11 (8 server action + 3 component)
+- **Tests:** 25, all passing
 - **TypeScript:** `tsc --noEmit` clean
-- **Security:** Zero known vulnerabilities, zero hardcoded credentials
+- **Security:** Zero known vulnerabilities, zero hardcoded credentials, inactivity auto-lock, backup dry-runs, input validation boundaries
 - **Migrations:** 5 SQL migrations
 - **Server Actions:** 10, all with structured error returns
 - **Components:** 20
-- **Shared Libraries:** 9
+- **Shared Libraries:** 10 (added logger)

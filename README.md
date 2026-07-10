@@ -15,8 +15,8 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
 | Fonts       | Fira Sans (body), Fira Code (heading/mono)
-| Testing     | Vitest (10 suites, 20 tests)        |
-| Logging     | Structured logger (level-filtered)  |
+| Testing     | Vitest (11 suites, 25 tests)        |
+| Logging     | Structured logger (JSON, level-filtered)  |
 | Health      | `/api/health` endpoint              |
 
 ## Features
@@ -38,11 +38,12 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 - **Structured error handling** — All server actions return `{ success, data, error }`; `ErrorBoundary` component for UI crash isolation
 - **Health monitoring** — `/api/health` endpoint with DB, MLEK, migration, and shift checks
 - **Graceful shutdown** — SIGTERM/SIGINT handler ensures clean DB closure
+- **Production Logging** — Outputs single-line JSON log strings with dynamic trace correlation ID extraction
 
 ## Security
 
 > [!IMPORTANT]
-> 8 rounds of comprehensive security audits completed. All High, Medium, and Low severity findings resolved. Zero known security vulnerabilities.
+> 9 rounds of comprehensive security audits completed. All High, Medium, and Low severity findings resolved. Zero known security vulnerabilities.
 
 ### Authentication & Access Control
 
@@ -52,6 +53,9 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 - **System daemon** seeded with a random unreachable hash
 - **Rate-limited authentication** with IP and account lockouts (transactional)
 - **Session cookies** via iron-session with enforced production password
+- **MLEK Inactivity Auto-Lock** — Decrypted master ledger key zero-filled and evicted from process memory after 30 minutes of inactivity
+- **Zod Validation Boundaries** — All mutating server actions strictly validate input types and constraints prior to execution
+- **Backup Verification** — Every backup copy runs `PRAGMA integrity_check` prior to final AES-256-GCM encryption
 
 ### Data Protection
 
@@ -110,21 +114,22 @@ src/
 
 ## Testing
 
-**10 test suites · 20 tests · all passing · tsc --noEmit clean**
+**11 test suites · 25 tests · all passing · tsc --noEmit clean**
 
 All tests run against in-memory SQLite with the full migration suite applied. Worker threads gracefully fall back to inline queries for in-memory databases.
 
-### Server Action Tests (7 suites)
+### Server Action Tests (8 suites)
 
-| Suite            | Coverage                                               |
-| ---------------- | ------------------------------------------------------ |
-| `auth`           | Rate limiting, PBKDF2 PIN override                     |
-| `inventory`      | Weighted Average Cost recalculation                    |
-| `ledger`         | HMAC integrity verification                            |
-| `shifts`         | Z-reading reconciliation                               |
-| `transactions`   | Price tampering, tax recalc, credit returns, VAT-exempt, cancellations |
-| `unlock`         | Bootstrap flow, DOP validation                         |
-| `deliveries`     | Dispatch validation                                    |
+| Suite                  | Coverage                                               |
+| ---------------------- | ------------------------------------------------------ |
+| `auth`                 | Rate limiting, PBKDF2 PIN override                     |
+| `inventory`            | Weighted Average Cost recalculation                    |
+| `ledger`               | HMAC integrity verification                            |
+| `shifts`               | Z-reading reconciliation                               |
+| `transactions`         | Price tampering, tax recalc, credit returns, VAT-exempt, cancellations |
+| `unlock`               | Bootstrap flow, DOP validation                         |
+| `deliveries`           | Dispatch validation                                    |
+| `production_hardening` | MLEK inactivity auto-lock, Zod validation boundaries, backup integrity dry-run |
 
 ### Component Tests (3 suites)
 

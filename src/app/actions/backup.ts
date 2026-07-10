@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import Database from 'better-sqlite3';
 import { getMlekSecret } from "@/lib/mlek";
 import { logger } from '@/lib/logger';
 
@@ -22,6 +23,18 @@ function checkRateLimit(ip: string): boolean {
   if (entry.count >= RATE_LIMIT_MAX) return false;
   entry.count++;
   return true;
+}
+
+function verifyBackupIntegrity(filePath: string): boolean {
+  try {
+    const tempDb = new Database(filePath, { readonly: true });
+    const result = tempDb.prepare('PRAGMA integrity_check').get() as { integrity_check?: string } | undefined;
+    tempDb.close();
+    return result?.integrity_check === 'ok';
+  } catch (err) {
+    logger.error('Backup integrity check failed to execute', err);
+    return false;
+  }
 }
 
 export async function exportEncryptedBackup(): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
@@ -42,6 +55,10 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     if (fs.existsSync(tempBackupPath)) fs.unlinkSync(tempBackupPath);
 
     db.prepare('VACUUM INTO ?').run(tempBackupPath);
+
+    if (!verifyBackupIntegrity(tempBackupPath)) {
+      throw new Error("DATABASE_CORRUPTION_DETECTED: Temp DB failed integrity check.");
+    }
 
     // Chunked AES-256-GCM encrypt: read in 64KB chunks, encrypt, collect
     const backupKey = crypto.pbkdf2Sync(secret, 'backup_derivation_salt', 100000, 32, 'sha256');

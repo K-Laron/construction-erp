@@ -8,6 +8,20 @@ import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { getActiveUserId } from './auth';
 import { getMlekSecret } from "@/lib/mlek";
+import { z } from 'zod';
+
+const CreateCustomerSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  phone: z.string().nullable(),
+  address: z.string().nullable(),
+  creditLimit: z.number().int().nonnegative(),
+  priceTier: z.enum(['Retail', 'Wholesale']).default('Retail'),
+  isVatExempt: z.number().int().min(0).max(1).default(0)
+});
+
+const DeactivateCustomerSchema = z.object({
+  customerId: z.string().uuid()
+});
 
 // Removed local getMlekSecret
 // Fetch all active customers
@@ -39,16 +53,17 @@ export async function createCustomer(
   isVatExempt: number = 0
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-  const secret = getMlekSecret();
-  const customerId = crypto.randomUUID();
+    const parsed = CreateCustomerSchema.parse({ name, phone, address, creditLimit, priceTier, isVatExempt });
+    const secret = getMlekSecret();
+    const customerId = crypto.randomUUID();
 
-  const encryptedPhone = phone ? encryptField(phone, secret) : null;
-  const encryptedAddress = address ? encryptField(address, secret) : null;
+    const encryptedPhone = parsed.phone ? encryptField(parsed.phone, secret) : null;
+    const encryptedAddress = parsed.address ? encryptField(parsed.address, secret) : null;
 
-  db.prepare(`
-    INSERT INTO customers (id, name, phone, address, credit_limit, current_balance, price_tier, is_vat_exempt, is_active, created_at)
-    VALUES (?, ?, ?, ?, ?, 0, ?, ?, 1, CURRENT_TIMESTAMP)
-  `).run(customerId, name, encryptedPhone, encryptedAddress, creditLimit, priceTier, isVatExempt);
+    db.prepare(`
+      INSERT INTO customers (id, name, phone, address, credit_limit, current_balance, price_tier, is_vat_exempt, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 1, CURRENT_TIMESTAMP)
+    `).run(customerId, parsed.name, encryptedPhone, encryptedAddress, parsed.creditLimit, parsed.priceTier, parsed.isVatExempt);
 
     return { success: true, data: customerId };
   } catch (err: unknown) {
@@ -59,8 +74,9 @@ export async function createCustomer(
 // Soft delete customer
 export async function deactivateCustomer(customerId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const parsed = DeactivateCustomerSchema.parse({ customerId });
     getMlekSecret(); // Ensure unlocked
-    const info = db.prepare("UPDATE customers SET is_active = 0 WHERE id = ?").run(customerId);
+    const info = db.prepare("UPDATE customers SET is_active = 0 WHERE id = ?").run(parsed.customerId);
     if (info.changes === 0) throw new Error("Customer not found");
     return { success: true };
   } catch (err: any) {
@@ -87,56 +103,63 @@ export async function getCustomerLedger(customerId: string): Promise<{ ledger: C
   return { ledger: rows, isIntegrityViolated };
 }
 
+const RecordPaymentSchema = z.object({
+  customerId: z.string().uuid(),
+  amount: z.number().int().positive(),
+  description: z.string().min(1)
+});
+
 // Receive cash payment and post credit ledger entry
 export async function recordPayment(customerId: string, amount: number, description: string): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-  const ledgerId = crypto.randomUUID();
-  const cashierId = await getActiveUserId();
-  
-  db.transaction(() => {
-    // 1. Update customer current balance (decrease outstanding A/R)
-    db.prepare(`
-      UPDATE customers SET current_balance = current_balance - ? WHERE id = ?
-    `).run(amount, customerId);
-
-    // 2. Fetch previous ledger entry's signature for chaining
-    const lastEntry = db.prepare(`
-      SELECT hmac_signature FROM customer_ledger 
-      WHERE customer_id = ? ORDER BY date DESC LIMIT 1
-    `).get(customerId) as { hmac_signature: string } | undefined;
+    const parsed = RecordPaymentSchema.parse({ customerId, amount, description });
+    const ledgerId = crypto.randomUUID();
+    const cashierId = await getActiveUserId();
     
-    const prevSig = lastEntry ? lastEntry.hmac_signature : "GENESIS";
+    db.transaction(() => {
+      // 1. Update customer current balance (decrease outstanding A/R)
+      db.prepare(`
+        UPDATE customers SET current_balance = current_balance - ? WHERE id = ?
+      `).run(parsed.amount, parsed.customerId);
 
-    // 3. Insert credit ledger entry
-    const entryData = {
-      id: ledgerId,
-      customer_id: customerId,
-      date: new Date().toISOString(),
-      type: 'CREDIT' as const,
-      amount,
-      reference_id: null,
-      description
-    };
+      // 2. Fetch previous ledger entry's signature for chaining
+      const lastEntry = db.prepare(`
+        SELECT hmac_signature FROM customer_ledger 
+        WHERE customer_id = ? ORDER BY date DESC LIMIT 1
+      `).get(parsed.customerId) as { hmac_signature: string } | undefined;
+      
+      const prevSig = lastEntry ? lastEntry.hmac_signature : "GENESIS";
 
-    const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
+      // 3. Insert credit ledger entry
+      const entryData = {
+        id: ledgerId,
+        customer_id: parsed.customerId,
+        date: new Date().toISOString(),
+        type: 'CREDIT' as const,
+        amount: parsed.amount,
+        reference_id: null,
+        description: parsed.description
+      };
 
-    db.prepare(`
-      INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
-      VALUES (?, ?, ?, 'CREDIT', ?, NULL, ?, ?, ?)
-    `).run(ledgerId, customerId, entryData.date, amount, description, signature, cashierId);
+      const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
 
-    // 4. Record G/L Journal Entry
-    // Debit Cash Drawer (1010) - Cash increases
-    // Credit Accounts Receivable (1110) - Customer debt decreases
-    createBalancedJournalEntry(
-      `Received payment from customer: ${customerId}`,
-      [
-        { accountId: 'acc-cash', type: 'DEBIT', amount },
-        { accountId: 'acc-ar', type: 'CREDIT', amount }
-      ],
-      cashierId
-    );
-  })();
+      db.prepare(`
+        INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
+        VALUES (?, ?, ?, 'CREDIT', ?, NULL, ?, ?, ?)
+      `).run(ledgerId, parsed.customerId, entryData.date, parsed.amount, parsed.description, signature, cashierId);
+
+      // 4. Record G/L Journal Entry
+      // Debit Cash Drawer (1010) - Cash increases
+      // Credit Accounts Receivable (1110) - Customer debt decreases
+      createBalancedJournalEntry(
+        `Received payment from customer: ${parsed.customerId}`,
+        [
+          { accountId: 'acc-cash', type: 'DEBIT', amount: parsed.amount },
+          { accountId: 'acc-ar', type: 'CREDIT', amount: parsed.amount }
+        ],
+        cashierId
+      );
+    })();
 
     return { success: true, data: ledgerId };
   } catch (err: unknown) {

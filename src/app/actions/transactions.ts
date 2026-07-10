@@ -56,6 +56,14 @@ export const CheckoutPayloadSchema = z.object({
   overridePin: z.string().optional()
 });
 
+export const ProcessReturnSchema = z.object({
+  transactionId: z.string().uuid(),
+  itemsToReturn: z.array(z.object({
+    itemId: z.string().uuid(),
+    quantity: z.number().int().positive()
+  })).min(1)
+});
+
 
 // Main checkout action
 export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ success: boolean; data?: { transactionId: string; siNumber: number | null; orNumber: number | null }; error?: string }> {
@@ -303,20 +311,21 @@ export async function processReturn(
   itemsToReturn: { itemId: string; quantity: number }[]
 ): Promise<{ success: boolean; data?: void; error?: string }> {
   try {
-  getMlekSecret(); // Ensure unlocked
-  const processedBy = await getActiveUserId();
+    const parsed = ProcessReturnSchema.parse({ transactionId, itemsToReturn });
+    getMlekSecret(); // Ensure unlocked
+    const processedBy = await getActiveUserId();
 
-  db.transaction(() => {
-    const tx = db.prepare("SELECT payment_method, balance_due, customer_id, tax, total_amount FROM transactions WHERE id = ?").get(transactionId) as { payment_method: string; balance_due: number; customer_id: string | null; tax: number; total_amount: number };
-    if (!tx) throw new Error("Transaction not found.");
+    db.transaction(() => {
+      const tx = db.prepare("SELECT payment_method, balance_due, customer_id, tax, total_amount FROM transactions WHERE id = ?").get(parsed.transactionId) as { payment_method: string; balance_due: number; customer_id: string | null; tax: number; total_amount: number };
+      if (!tx) throw new Error("Transaction not found.");
 
-    let totalRefundAmount = 0;
-    let totalCostRefund = 0;
+      let totalRefundAmount = 0;
+      let totalCostRefund = 0;
 
-    for (const item of itemsToReturn) {
-      const origItem = db.prepare(`
-        SELECT quantity, quantity_returned, unit_price, unit_cost FROM transaction_items WHERE transaction_id = ? AND item_id = ?
-      `).get(transactionId, item.itemId) as { quantity: number; quantity_returned: number | null; unit_price: number; unit_cost: number };
+      for (const item of parsed.itemsToReturn) {
+        const origItem = db.prepare(`
+          SELECT quantity, quantity_returned, unit_price, unit_cost FROM transaction_items WHERE transaction_id = ? AND item_id = ?
+        `).get(parsed.transactionId, item.itemId) as { quantity: number; quantity_returned: number | null; unit_price: number; unit_cost: number };
 
       if (!origItem) throw new Error("Item not found in transaction.");
       const returnedSoFar = origItem.quantity_returned || 0;
@@ -324,7 +333,7 @@ export async function processReturn(
         throw new Error("Cannot return more than originally purchased or already returned.");
       }
 
-      db.prepare("UPDATE transaction_items SET quantity_returned = ? WHERE transaction_id = ? AND item_id = ?").run(returnedSoFar + item.quantity, transactionId, item.itemId);
+      db.prepare("UPDATE transaction_items SET quantity_returned = ? WHERE transaction_id = ? AND item_id = ?").run(returnedSoFar + item.quantity, parsed.transactionId, item.itemId);
 
       // Restock inventory and log audit trail
       const invItem = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(item.itemId) as { stock_quantity: number };
@@ -362,7 +371,7 @@ export async function processReturn(
         }
         
         // Update balance due on the transaction
-        db.prepare("UPDATE transactions SET balance_due = balance_due - ? WHERE id = ?").run(actualCreditRefund, transactionId);
+        db.prepare("UPDATE transactions SET balance_due = balance_due - ? WHERE id = ?").run(actualCreditRefund, parsed.transactionId);
 
         // Reverse customer ledger
         if (tx.customer_id) {
@@ -377,8 +386,8 @@ export async function processReturn(
             date: new Date().toISOString(),
             type: 'CREDIT' as const,
             amount: actualCreditRefund,
-            reference_id: transactionId,
-            description: `Return reversal - Txn ${transactionId.slice(0, 8)}`
+            reference_id: parsed.transactionId,
+            description: `Return reversal - Txn ${parsed.transactionId.slice(0, 8)}`
           };
 
           const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
@@ -386,7 +395,7 @@ export async function processReturn(
           db.prepare(`
             INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
             VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)
-          `).run(ledgerId, tx.customer_id, entryData.date, entryData.amount, transactionId, entryData.description, signature, processedBy);
+          `).run(ledgerId, tx.customer_id, entryData.date, entryData.amount, parsed.transactionId, entryData.description, signature, processedBy);
         }
       } else {
         glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: totalRefundAmount });
@@ -401,7 +410,7 @@ export async function processReturn(
       const totalD = glLines.filter(l => l.type === 'DEBIT').reduce((s, l) => s + l.amount, 0);
       const totalC = glLines.filter(l => l.type === 'CREDIT').reduce((s, l) => s + l.amount, 0);
       if (totalD === totalC && totalD > 0) {
-        createBalancedJournalEntry(`Return: ${transactionId.slice(0, 8)}`, glLines, processedBy);
+        createBalancedJournalEntry(`Return: ${parsed.transactionId.slice(0, 8)}`, glLines, processedBy);
       }
     }
 
@@ -409,7 +418,7 @@ export async function processReturn(
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
       VALUES (?, CURRENT_TIMESTAMP, ?, 'SALE_RETURN', ?, NULL, ?)
-    `).run(crypto.randomUUID(), processedBy, transactionId, `Returned ${itemsToReturn.length} line items`);
+    `).run(crypto.randomUUID(), processedBy, parsed.transactionId, `Returned ${parsed.itemsToReturn.length} line items`);
   })();
 
     return { success: true };
