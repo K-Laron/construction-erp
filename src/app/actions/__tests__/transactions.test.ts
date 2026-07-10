@@ -58,7 +58,7 @@ describe('Transaction Server Actions', () => {
 
     // Process a return
     await processReturn(transactionId, [
-      { itemId, quantity: 1000, isRestock: true }
+      { itemId, quantity: 1000 }
     ], 'user');
 
     // Return should debit vat-payable by 120

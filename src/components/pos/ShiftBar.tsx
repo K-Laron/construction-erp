@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Play, Square, AlertCircle, Loader2 } from 'lucide-react';
 import { getCurrentShift, openShift, closeShift } from '@/app/actions/shifts';
 import { formatCurrency, parsePesoCentavos } from '@/lib/format';
+import { toast } from 'sonner';
 
 interface ShiftBarProps {
   cashierId: string;
@@ -68,7 +69,7 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
       setOpenTime(null);
       onShiftChange(null);
       setShowCloseModal(false);
-      alert(`Shift closed successfully!\nDiscrepancy: ${formatCurrency(result.discrepancy)}`);
+      toast.success(`Shift closed successfully! Discrepancy: ${formatCurrency(result.discrepancy)}`);
     } catch (err: any) {
       setError(err.message || 'Failed to close shift.');
     }

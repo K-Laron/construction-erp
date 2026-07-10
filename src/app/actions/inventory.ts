@@ -2,7 +2,7 @@
 
 import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
-import { InventoryItem, Supplier } from '@/types';
+import { InventoryItem, Supplier, SupplierLedgerEntry } from '@/types';
 import crypto from 'crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
@@ -214,4 +214,23 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
   })();
 
   return receiptId;
+}
+
+// Retrieve supplier ledger and check HMAC signature validity
+export async function getSupplierLedger(supplierId: string): Promise<{ ledger: SupplierLedgerEntry[]; isIntegrityViolated: boolean }> {
+  getMlekSecret(); // Ensure unlocked
+  const rows = db.prepare("SELECT * FROM supplier_ledger WHERE supplier_id = ? ORDER BY date ASC").all(supplierId) as SupplierLedgerEntry[];
+
+  let prevSig = "GENESIS";
+  let isIntegrityViolated = false;
+
+  for (const entry of rows) {
+    const expectedSig = calculateHMACSignature(entry, prevSig, getMlekSecret());
+    if (entry.hmac_signature !== expectedSig) {
+      isIntegrityViolated = true;
+    }
+    prevSig = entry.hmac_signature || "CORRUPT";
+  }
+
+  return { ledger: rows, isIntegrityViolated };
 }

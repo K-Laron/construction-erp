@@ -14,6 +14,10 @@ const sessionOptions = {
   },
 };
 
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_PASSWORD) {
+  throw new Error('SESSION_PASSWORD environment variable is required in production.');
+}
+
 export async function getSession() {
   const cookieStore = await cookies();
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions);

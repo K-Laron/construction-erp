@@ -202,6 +202,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     if ((paymentMethod === 'Credit' || paymentMethod === 'Check') && balanceDue > 0) {
       glLines.push({ accountId: 'acc-ar', type: 'DEBIT', amount: balanceDue });
     }
+    // For POS combo payments (e.g. paying part in cash, remainder goes to credit)
     if (paymentMethod === 'Cash' && amountPaid > 0 && balanceDue > 0) {
       glLines.push({ accountId: 'acc-ar', type: 'DEBIT', amount: balanceDue });
     }
