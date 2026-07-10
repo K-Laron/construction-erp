@@ -1,8 +1,9 @@
 "use client";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 import { Search, UserPlus, CreditCard, ChevronDown, ChevronUp, ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 import { getCustomers, getCustomerLedger } from '@/app/actions/customers';
 import { formatCurrency, formatDate } from '@/lib/format';
@@ -32,6 +33,7 @@ export default function CustomerManager() {
       setCustomers(data);
     } catch (err) {
       logger.error(String(err), err);
+      toast.error("Failed to load customers.");
     }
     setLoading(false);
   };
@@ -54,6 +56,7 @@ export default function CustomerManager() {
       setIntegrityViolated(isIntegrityViolated);
     } catch (err) {
       logger.error(String(err), err);
+      toast.error("Failed to load customer ledger.");
     }
     setLedgerLoading(false);
   };
@@ -111,9 +114,8 @@ export default function CustomerManager() {
                 const isOver = c.current_balance > c.credit_limit;
                 const isExpanded = expandedId === c.id;
                 return (
-                  <>
+                  <Fragment key={c.id}>
                     <tr
-                      key={c.id}
                       className={`border-b border-surface-700 hover:bg-surface-900/40 transition-colors ${
                         isOver ? 'bg-rose-950/5' : ''
                       }`}
@@ -216,7 +218,7 @@ export default function CustomerManager() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

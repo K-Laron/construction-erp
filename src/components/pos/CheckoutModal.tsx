@@ -42,14 +42,14 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
     if (isOpen) {
       getCustomers()
         .then(setCustomers)
-        .catch(err => logger.error(err.message, err));
+        .catch(err => { logger.error(err.message, err); toast.error("Failed to load customers."); });
       getUsers()
         .then(users => {
           const mgrs = users.filter(u => u.is_active === 1 && (u.role === 'Admin' || u.role === 'Manager'));
           setManagers(mgrs);
           if (mgrs.length > 0) setSelectedManagerUsername(mgrs[0].username);
         })
-        .catch(err => logger.error(err.message, err));
+        .catch(err => { logger.error(err.message, err); toast.error("Failed to load users."); });
       setSuccessData(null);
       setError('');
       setAmountPaidStr('');
@@ -104,9 +104,10 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
       toast.success("Transaction completed successfully!");
       setSuccessData(result.data!);
       onSuccess({ transactionId: result.data!.transactionId, siNumber: result.data!.siNumber, orNumber: result.data!.orNumber, payload });
-    } catch (err: any) {
-      setError(err.message || 'Checkout failed.');
-      toast.error(err.message || 'Checkout failed.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Checkout failed.';
+      setError(message);
+      toast.error(message);
     }
     setLoading(false);
   };
@@ -124,10 +125,11 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
 
           {/* Customer Mapping */}
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
+            <label htmlFor="checkout-customer" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
               Customer Account
             </label>
             <select
+              id="checkout-customer"
               value={selectedCustomerId}
               onChange={e => setSelectedCustomerId(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-surface-950 border border-surface-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 text-sm"
@@ -160,7 +162,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
               Payment Method
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Payment Method">
               {[
                 { id: 'Cash', label: 'Cash', icon: Banknote },
                 { id: 'Credit', label: 'Credit Account', icon: UserCheck },
@@ -228,12 +230,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
           {paymentMethod !== 'Credit' ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
+                <label htmlFor="checkout-amount" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
                   Amount Received
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-interactive-400 font-semibold text-sm">₱</span>
                   <input
+                    id="checkout-amount"
                     type="number"
                     step="0.01"
                     value={amountPaidStr}

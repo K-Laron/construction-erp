@@ -3,7 +3,7 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Truck, CheckCircle2, ChevronDown, ChevronUp, Loader2, Calendar } from 'lucide-react';
 import { getPendingDeliveries, getDeliveryHistory, confirmDelivery } from '@/app/actions/deliveries';
 import { formatCurrency, formatDate, formatQuantity } from '@/lib/format';
@@ -30,13 +30,13 @@ export default function DeliveryDispatch() {
       setDeliveries(data);
     } catch (err) {
       logger.error(String(err), err);
+      toast.error("Failed to load pending deliveries.");
     }
     setLoading(false);
   };
 
   useEffect(() => {
     loadPending();
-      toast.success("Delivery confirmed successfully!");
   }, []);
 
   const handleRowExpand = async (transactionId: string) => {
@@ -52,6 +52,7 @@ export default function DeliveryDispatch() {
       setTrips(data);
     } catch (err) {
       logger.error(String(err), err);
+      toast.error("Failed to load delivery history.");
     }
     setTripsLoading(false);
   };
@@ -112,8 +113,8 @@ export default function DeliveryDispatch() {
                   : 'bg-zinc-500/10 border-zinc-500/20 text-zinc-400';
                   
                 return (
-                  <>
-                    <tr key={del.transaction_id} className="border-b border-surface-700 hover:bg-surface-900/30 transition-colors">
+                  <Fragment key={del.transaction_id}>
+                    <tr className="border-b border-surface-700 hover:bg-surface-900/30 transition-colors">
                       <td className="py-3.5 px-4 font-mono text-interactive-500 flex items-center gap-2">
                         <button
                           onClick={() => handleRowExpand(del.transaction_id)}
@@ -203,7 +204,7 @@ export default function DeliveryDispatch() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

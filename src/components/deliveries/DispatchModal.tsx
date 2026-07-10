@@ -36,7 +36,7 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
           });
           setDispatchQtys(initialQtys);
         })
-        .catch(err => logger.error(err.message, err))
+        .catch(err => { logger.error(err.message, err); toast.error("Failed to load remaining items."); })
         .finally(() => setLoading(false));
       setError('');
       setDriverName('');
@@ -73,9 +73,10 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
       onSuccess();
       toast.success("Delivery dispatched successfully!");
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to dispatch delivery.');
-      toast.error(err.message || 'Failed to dispatch delivery.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to dispatch delivery.';
+      setError(message);
+      toast.error(message);
     }
     setLoading(false);
   };
@@ -91,8 +92,9 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Driver Name</label>
+            <label htmlFor="dispatch-driver-name" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Driver Name</label>
             <input
+              id="dispatch-driver-name"
               type="text"
               required
               value={driverName}
@@ -102,8 +104,9 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Truck Plate Number</label>
+            <label htmlFor="dispatch-truck-plate" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Truck Plate Number</label>
             <input
+              id="dispatch-truck-plate"
               type="text"
               required
               value={truckPlate}
@@ -115,8 +118,8 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Items to Deliver</label>
-          <div className="border border-surface-800 rounded-xl overflow-hidden bg-surface-950/20 max-h-60 overflow-y-auto">
+          <label htmlFor="dispatch-items" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Items to Deliver</label>
+          <div id="dispatch-items" className="border border-surface-800 rounded-xl overflow-hidden bg-surface-950/20 max-h-60 overflow-y-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-surface-900 text-interactive-400 font-semibold border-b border-surface-800">
                 <tr>

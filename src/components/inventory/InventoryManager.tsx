@@ -3,6 +3,7 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 import { Search, PlusCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
 import { formatCurrency, formatQuantity } from '@/lib/format';
@@ -23,6 +24,7 @@ export default function InventoryManager() {
       setInventory(data);
     } catch (err) {
       logger.error(String(err), err);
+      toast.error("Failed to load inventory.");
     }
     setLoading(false);
   };

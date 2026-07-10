@@ -57,8 +57,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
       setSellingPriceStr('0.00');
       setWholesalePriceStr('0.00');
       setReorderLevelStr('0');
-    } catch (err: any) {
-      setError(err.message || 'Failed to create product.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create product.');
     }
     setLoading(false);
   };
@@ -74,8 +74,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Product Name</label>
+            <label htmlFor="product-name" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Product Name</label>
             <input
+              id="product-name"
               type="text"
               required
               value={name}
@@ -88,8 +89,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Category</label>
+            <label htmlFor="product-category" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Category</label>
             <select
+              id="product-category"
               value={category}
               onChange={e => setCategory(e.target.value)}
               className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-sm focus:outline-none focus:border-indigo-500"
@@ -102,8 +104,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Selling Unit</label>
+            <label htmlFor="product-unit" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Selling Unit</label>
             <input
+              id="product-unit"
               type="text"
               required
               value={unit}
@@ -116,8 +119,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Initial Stock</label>
+            <label htmlFor="product-stock" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Initial Stock</label>
             <input
+              id="product-stock"
               type="number"
               step="0.001"
               required
@@ -127,8 +131,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Reorder Level Alert</label>
+            <label htmlFor="product-reorder" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Reorder Level Alert</label>
             <input
+              id="product-reorder"
               type="number"
               step="0.001"
               required
@@ -141,10 +146,11 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Cost Price</label>
+            <label htmlFor="product-cost-price" className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Cost Price</label>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 text-xs">₱</span>
               <input
+                id="product-cost-price"
                 type="number"
                 step="0.01"
                 required
@@ -155,10 +161,11 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Retail Price</label>
+            <label htmlFor="product-retail-price" className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Retail Price</label>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 text-xs">₱</span>
               <input
+                id="product-retail-price"
                 type="number"
                 step="0.01"
                 required
@@ -169,10 +176,11 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Wholesale Price</label>
+            <label htmlFor="product-wholesale-price" className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Wholesale Price</label>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 text-xs">₱</span>
               <input
+                id="product-wholesale-price"
                 type="number"
                 step="0.01"
                 required

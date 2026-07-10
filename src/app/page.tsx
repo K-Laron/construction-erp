@@ -13,7 +13,7 @@ import InventoryManager from '@/components/inventory/InventoryManager';
 import DeliveryDispatch from '@/components/deliveries/DeliveryDispatch';
 import ReportsPanel from '@/components/reports/ReportsPanel';
 import MaintenancePanel from '@/components/maintenance/MaintenancePanel';
-import A5PrintReceipt from '@/components/print/A5PrintReceipt';
+import A6PrintReceipt from '@/components/print/A6PrintReceipt';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 export default function Home() {
@@ -34,9 +34,9 @@ export default function Home() {
       if (!status.isUnlocked) {
         setCurrentUser(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error(String(err), err);
-      if (err.message?.includes('DATABASE_LOCKED') || err.message?.includes('UNAUTHORIZED')) {
+      if (err instanceof Error && (err.message.includes('DATABASE_LOCKED') || err.message.includes('UNAUTHORIZED'))) {
         setIsUnlocked(false);
         setCurrentUser(null);
       }
@@ -130,7 +130,7 @@ export default function Home() {
     <>
       {printData && (
         <div className="hidden print:block">
-          <A5PrintReceipt
+          <A6PrintReceipt
             transaction={printData.transaction}
             items={printData.items}
             customerName={printData.customerName}

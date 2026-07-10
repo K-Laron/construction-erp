@@ -31,8 +31,8 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
       } else {
         setError(result.error || 'Unlock failed.');
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Unlock failed.');
     }
     setLoading(false);
   };
@@ -45,8 +45,10 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
       const wordList = bip39Words as string[];
 
       const words: string[] = [];
+      const indices = new Uint32Array(12);
+      crypto.getRandomValues(indices);
       for (let i = 0; i < 12; i++) {
-        words.push(wordList[Math.floor(Math.random() * wordList.length)]);
+        words.push(wordList[indices[i] % wordList.length]);
       }
 
       const { bootstrapStore } = await import('@/app/actions/unlock');
@@ -59,8 +61,8 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
       } else {
         setError(result.error || 'Setup failed.');
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Setup failed.');
     }
     setLoading(false);
   };
@@ -77,8 +79,8 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
       } else {
         setError(result.error || 'Recovery failed.');
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Recovery failed.');
     }
     setLoading(false);
   };
@@ -174,10 +176,11 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
         {mode === 'unlock' && (
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-interactive-500 mb-2">Daily Operational Passphrase</label>
+              <label htmlFor="unlock-dop" className="block text-sm font-semibold text-interactive-500 mb-2">Daily Operational Passphrase</label>
               <div className="relative group">
                 <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-interactive-600 transition-colors" />
                 <input
+                  id="unlock-dop"
                   type="password"
                   value={dop}
                   onChange={e => setDop(e.target.value)}
@@ -205,8 +208,9 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
               Create a strong passphrase (14+ chars, mix of upper/lower/digits/symbols) to protect your store data daily.
             </div>
             <div>
-              <label className="block text-sm font-semibold text-interactive-500 mb-2">Daily Operational Passphrase</label>
+              <label htmlFor="setup-dop" className="block text-sm font-semibold text-interactive-500 mb-2">Daily Operational Passphrase</label>
               <input
+                id="setup-dop"
                 type="password"
                 value={dop}
                 onChange={e => setDop(e.target.value)}
@@ -239,7 +243,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
             </div>
             <div>
               <label className="block text-sm font-semibold text-interactive-500 mb-2">12-Word Recovery Mnemonic</label>
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-3 gap-2.5" role="group" aria-label="12-Word Recovery Mnemonic">
                 {mnemonicWords.map((word, i) => (
                   <input
                     key={i}
@@ -257,8 +261,9 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-interactive-500 mb-2">New Daily Operational Passphrase</label>
+              <label htmlFor="recover-new-dop" className="block text-sm font-semibold text-interactive-500 mb-2">New Daily Operational Passphrase</label>
               <input
+                id="recover-new-dop"
                 type="password"
                 value={newDop}
                 onChange={e => setNewDop(e.target.value)}

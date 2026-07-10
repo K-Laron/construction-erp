@@ -3,6 +3,7 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 import { Search, ShoppingCart, Trash2, Plus, Minus, Tag, Truck, Receipt, Loader2, AlertTriangle } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
 import { formatCurrency, formatQuantity } from '@/lib/format';
@@ -37,6 +38,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
       setInventory(data);
     } catch (err) {
       logger.error(String(err), err);
+      toast.error("Failed to load inventory.");
     }
     setLoading(false);
   };

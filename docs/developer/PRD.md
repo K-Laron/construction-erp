@@ -184,7 +184,7 @@ When a check bounces, the customer's ledger balance and the G/L adjust in lockst
 To ensure correct tax tracking, the cashier shift drawer reconciliation (Phase 14) generates a formal **Z-Reading Report** upon shift closure:
 - **Report Ledger**: Computes total gross sales (separated into Vatable Sales, VAT-Exempt Sales, Zero-Rated Sales), total collected VAT tax (12%), total voided invoices, total sales returns, and cash discrepancies.
 - **Tally Verification Boundaries**: Only checkouts with `payment_method = 'Cash'` increment the `shifts.expected_cash` totals. Transactions processed under ledger credit accounts or checks (PDCs) bypass the physical cash drawer expected count.
-- **Output**: Generates a structured PDF/A5 compliant printout, saves a static snapshot in the database, and locks the shift history from future modification.
+- **Output**: Generates a structured A6 portrait printout (1/4 A4 size), saves a static snapshot in the database, and locks the shift history from future modification.
 
 ### I. Soft-Deletes for Relational Integrity
 To preserve complete financial records and avoid breaking cascading foreign key references:

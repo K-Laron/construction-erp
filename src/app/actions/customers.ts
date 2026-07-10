@@ -79,8 +79,8 @@ export async function deactivateCustomer(customerId: string): Promise<{ success:
     const info = db.prepare("UPDATE customers SET is_active = 0 WHERE id = ?").run(parsed.customerId);
     if (info.changes === 0) throw new Error("Customer not found");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to deactivate customer.' };
   }
 }
 

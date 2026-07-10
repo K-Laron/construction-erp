@@ -76,8 +76,8 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       const uData = await getUsers();
       setUsers(uData);
       toast.success('Staff user created successfully!');
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to create user.');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create user.');
     }
     setFormLoading(false);
   };
@@ -101,8 +101,8 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       } else {
         toast.error('Backup failed: ' + result.error);
       }
-    } catch (err: any) {
-      toast.error('Backup failed: ' + err.message);
+    } catch (err: unknown) {
+      toast.error('Backup failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
@@ -137,8 +137,8 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
         setScanResult('clean');
         setIntegrityDetails('All ledger accounts balanced. All customer ledger cryptographic signature chains verified intact.');
       }
-    } catch (err: any) {
-      setIntegrityDetails(err.message || 'Scan failed.');
+    } catch (err: unknown) {
+      setIntegrityDetails(err instanceof Error ? err.message : 'Scan failed.');
     }
     setScanning(false);
   };
@@ -162,8 +162,8 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       } else {
         toast.error('Transaction not found.');
       }
-    } catch (err: any) {
-      toast.error('Error finding transaction: ' + err.message);
+    } catch (err: unknown) {
+      toast.error('Error finding transaction: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
     setSearchingTxn(false);
   };
@@ -190,8 +190,8 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       toast.success('Return processed and inventory restocked successfully!');
       setActiveTxnDetails(null);
       setTxnSearchId('');
-    } catch (err: any) {
-      toast.error('Failed to process return: ' + err.message);
+    } catch (err: unknown) {
+      toast.error('Failed to process return: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
     setReturnLoading(false);
   };

@@ -54,8 +54,8 @@ describe('Auth Actions', () => {
     // Correct PIN should succeed or throw something else than CREDIT_LIMIT_EXCEEDED
     try {
       await processCheckout(payload);
-    } catch(e: any) {
-      expect(e.message).not.toContain("Invalid Manager Override PIN");
+    } catch(e: unknown) {
+      if (e instanceof Error) expect(e.message).not.toContain("Invalid Manager Override PIN");
     }
 
     const invalidPayload = { ...payload, overridePin: 'wrong' };

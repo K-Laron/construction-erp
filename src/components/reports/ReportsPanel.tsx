@@ -3,6 +3,7 @@ import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 import { BarChart3, TrendingUp, DollarSign, Users, Package, Loader2 } from 'lucide-react';
 import { getTrialBalance, runHeavyAuditReport } from '@/app/actions/ledger';
 import { getInventory } from '@/app/actions/inventory';
@@ -84,6 +85,7 @@ export default function ReportsPanel() {
 
       } catch (err) {
         logger.error(String(err), err);
+        toast.error("Failed to load report data.");
       }
       setLoading(false);
     }

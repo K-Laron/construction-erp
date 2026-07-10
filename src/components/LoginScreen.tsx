@@ -25,8 +25,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       } else {
         setError(result.error || 'Login failed.');
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Login failed.');
     }
     setLoading(false);
   };
@@ -51,10 +51,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-interactive-500 mb-2 tracking-wide">Username</label>
+            <label htmlFor="login-username" className="block text-sm font-semibold text-interactive-500 mb-2 tracking-wide">Username</label>
             <div className="relative group">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-accent-500 transition-colors" />
               <input
+                id="login-username"
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
@@ -67,11 +68,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-interactive-500 mb-2 tracking-wide">PIN</label>
+            <label htmlFor="login-pin" className="block text-sm font-semibold text-interactive-500 mb-2 tracking-wide">PIN</label>
             <div className="relative group">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-accent-500 transition-colors" />
               <input
-                id="pin-input"
+                id="login-pin"
                 type="password"
                 value={pin}
                 onChange={e => setPin(e.target.value)}

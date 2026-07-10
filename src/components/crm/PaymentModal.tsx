@@ -41,9 +41,10 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
       onSuccess();
       toast.success("Payment recorded successfully!");
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to record payment.');
-      toast.error(err.message || 'Failed to record payment.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to record payment.';
+      setError(message);
+      toast.error(message);
     }
     setLoading(false);
   };
@@ -71,10 +72,11 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Payment Amount</label>
+          <label htmlFor="payment-amount" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Payment Amount</label>
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-interactive-400 font-bold">₱</span>
             <input
+              id="payment-amount"
               type="number"
               step="0.01"
               required
@@ -87,8 +89,9 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Reference / Description</label>
+          <label htmlFor="payment-description" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Reference / Description</label>
           <input
+            id="payment-description"
             type="text"
             required
             value={description}

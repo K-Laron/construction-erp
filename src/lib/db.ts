@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -10,7 +11,7 @@ if (!fs.existsSync(dbDir)) {
 }
 
 declare global {
-  var dbInstance: any;
+  var dbInstance: DatabaseType | undefined;
 }
 
 const dbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(dbDir, 'database.db');

@@ -35,8 +35,9 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
           setOpenTime(shift.opened_at);
           onShiftChange(shift.id);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error(String(err), err);
+        toast.error("Failed to load shift data.");
       }
     }
     loadShift();
@@ -54,8 +55,8 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
       setOpenTime(new Date().toISOString());
       onShiftChange(shiftId);
       setShowFloatModal(false);
-    } catch (err: any) {
-      setError(err.message || 'Failed to open shift.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to open shift.');
     }
     setLoading(false);
   };
@@ -73,8 +74,8 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
       onShiftChange(null);
       setShowCloseModal(false);
       toast.success(`Shift closed successfully! Discrepancy: ${formatCurrency(result.data!.discrepancy)}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to close shift.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to close shift.');
     }
     setLoading(false);
   };
@@ -137,10 +138,11 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
       <Modal isOpen={showFloatModal} onClose={() => setShowFloatModal(false)} title="Open Shift - Cash Drawer Float" size="sm">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-interactive-400 mb-1.5">Opening Drawer Cash (Float)</label>
+            <label htmlFor="shift-float" className="block text-sm text-interactive-400 mb-1.5">Opening Drawer Cash (Float)</label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-interactive-400 font-medium">₱</span>
               <input
+                id="shift-float"
                 type="number"
                 step="0.01"
                 value={openingFloatStr}
@@ -173,10 +175,11 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
             Enter the actual counted physical cash in the drawer to reconcile the shift.
           </p>
           <div>
-            <label className="block text-sm text-interactive-400 mb-1.5">Counted Drawer Cash</label>
+            <label htmlFor="shift-counted-cash" className="block text-sm text-interactive-400 mb-1.5">Counted Drawer Cash</label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-interactive-400 font-medium">₱</span>
               <input
+                id="shift-counted-cash"
                 type="number"
                 step="0.01"
                 value={actualCashStr}

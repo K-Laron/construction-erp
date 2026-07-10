@@ -42,9 +42,10 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
       setCreditLimitStr('0.00');
       setPriceTier('Retail');
       setIsVatExempt(false);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create customer.');
-      toast.error(err.message || 'Failed to create customer.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create customer.';
+      setError(message);
+      toast.error(message);
     }
     setLoading(false);
   };
@@ -59,8 +60,9 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
         )}
 
         <div>
-          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Customer Name</label>
+          <label htmlFor="customer-name" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Customer Name</label>
           <input
+            id="customer-name"
             type="text"
             required
             value={name}
@@ -72,8 +74,9 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Phone Number</label>
+            <label htmlFor="customer-phone" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Phone Number</label>
             <input
+              id="customer-phone"
               type="text"
               value={phone}
               onChange={e => setPhone(e.target.value)}
@@ -82,10 +85,11 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Credit Limit</label>
+            <label htmlFor="customer-credit-limit" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Credit Limit</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-interactive-400 text-sm">₱</span>
               <input
+                id="customer-credit-limit"
                 type="number"
                 step="0.01"
                 value={creditLimitStr}
@@ -97,8 +101,9 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Jobsite/Billing Address</label>
+          <label htmlFor="customer-address" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Jobsite/Billing Address</label>
           <textarea
+            id="customer-address"
             value={address}
             onChange={e => setAddress(e.target.value)}
             placeholder="Enter full physical address..."
@@ -109,8 +114,9 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Price Tier</label>
+            <label htmlFor="customer-price-tier" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Price Tier</label>
             <select
+              id="customer-price-tier"
               value={priceTier}
               onChange={e => setPriceTier(e.target.value as 'Retail' | 'Wholesale')}
               className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"

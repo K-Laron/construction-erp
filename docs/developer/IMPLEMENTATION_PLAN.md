@@ -237,7 +237,7 @@ Build a desktop-first, local-first management suite to operate a complete small-
 
 ---
 
-### Phase 6: Delivery Queue & A5 Print Engine
+### Phase 6: Delivery Queue & A6 Print Engine
 
 #### Task 6.1: Delivery Pending Queue
 - **Description**: Build `src/components/DeliveryDispatch.tsx` showing a table of transactions with delivery status `Pending` or `Partially Delivered`.
@@ -251,17 +251,17 @@ Build a desktop-first, local-first management suite to operate a complete small-
   1. Dispatched quantities must not exceed the remaining quantities.
   2. Dispatch updates quantities and changes status to `Fully Delivered` if all items are shipped.
 
-#### Task 6.3: A5 Landscape Print Styles
-- **Description**: Implement print-only styling wrapper component `src/components/A5PrintReceipt.tsx` styled to fit A5 landscape page margins (`size: A5 landscape`).
+#### Task 6.3: A6 Portrait Print Styles
+- **Description**: Implement print-only styling wrapper component `src/components/A6PrintReceipt.tsx` styled to fit A6 portrait page margins (`size: A6`).
 - **Approval Metrics**:
-  1. Print view hides screen navs and buttons during print mode.
-  2. Table fits exactly inside the 190mm width boundary.
+   1. Print view hides screen navs and buttons during print mode.
+   2. Table fits exactly inside the 93mm content width boundary (A6 portrait, 6mm margins).
 
 #### Task 6.4: Print trigger hooks
 - **Description**: Bind print triggers to the POS checkout success screen and historic delivery dispatches.
 - **Approval Metrics**:
   1. Clicking print opens the native browser print preview.
-  2. Preview margins are correct and default print orientation selects Landscape.
+   2. Preview margins are correct and default print orientation selects Portrait.
 
 ---
 
@@ -522,14 +522,74 @@ node scratch/verify-all-modules.js
 - Configured a 30-second interval status checker inside the client-side main `Home` view wrapper (`page.tsx`) to detect when the store has been locked. Clears local cashier state and redirects operators immediately back to the DOP Unlock screen.
 - Status: ✅ Complete
 
+### Phase 17: UI/UX Overhaul & Audit Remediation (Completed)
+
+#### Task 17.1: UI/UX Overhaul
+- Migrated all `bg-slate-*` classes to semantic `surface-*`, `interactive-*`, `accent-*`, `error-*`, `warning-*` tokens
+- Implemented light/dark mode with system preference detection + manual toggle
+- Replaced standard `<table>` styling with glass-panel cards and rounded borders
+- Added `glass-panel`, `glass-panel-dense`, `btn-hover-fx`, `focus-ring`, `transition-smooth`, `animate-slide-up` utility classes
+- Replaced plain `<input>`/`<button>` elements with consistently styled versions using theme tokens
+- Added `SkeletonTable` loading states to 4 components
+- Updated Modal component with size variants and backdrop blur
+- Status: ✅ Complete
+
+#### Task 17.2: Production-Grade JSON Logger
+- Configured structured logger with single-line JSON output in production
+- Dynamic trace ID extraction from Next.js request context
+- Level-filtered with detailed error stack traces
+- Status: ✅ Complete
+
+#### Task 17.3: Cryptographic Randomness Fix
+- Replaced `Math.random()` with `crypto.getRandomValues()` for 12-word recovery mnemonic generation in `UnlockScreen.tsx`
+- Fixes predictable mnemonic vulnerability (🔴 Critical)
+- Status: ✅ Complete
+
+#### Task 17.4: Stray Toast Removal
+- Removed orphan `toast.success("Delivery confirmed successfully!")` from `DeliveryDispatch.tsx` `useEffect` — it fired on every component mount instead of only after `confirmDelivery`
+- Copy-paste artifact from `executeConfirmTrip` handler
+- Status: ✅ Complete
+
+#### Task 17.5: Silent Failure Remediation
+- Added `toast.error()` user feedback to 12 previously-silent catch blocks across 7 components
+- Components now show error toasts on load failures: `POSRegister`, `InventoryManager`, `CustomerManager`, `DeliveryDispatch`, `ReportsPanel`, `CheckoutModal`, `DispatchModal`, `ShiftBar`
+- Status: ✅ Complete
+
+#### Task 17.6: React Fragment Key Warnings
+- Replaced bare `<>...</>` with `<Fragment key={...}>` inside `.map()` in `DeliveryDispatch.tsx` and `CustomerManager.tsx`
+- Eliminates React key warning on arrays inside fragments
+- Status: ✅ Complete
+
+#### Task 17.7: TypeScript catch Clause Narrowing
+- Migrated all 25 `catch (e: any)` occurrences across 15 files to `catch (e: unknown)` with `instanceof Error` narrowing
+- Affected files: server actions, components, and test files
+- Status: ✅ Complete
+
+#### Task 17.8: Accessibility — Form Label Associations
+- Added `htmlFor` + `id` to 30 `<label>`/`<input>` pairs across 8 modal/form files
+- Added `role="group"` and `role="radiogroup"` with `aria-label` for grid/button-group inputs
+- Files: `LoginScreen`, `UnlockScreen`, `ProductFormModal`, `DispatchModal`, `PaymentModal`, `CustomerFormModal`, `CheckoutModal`, `ShiftBar`
+- Status: ✅ Complete
+
+#### Task 17.9: dbInstance Type Safety
+- Changed `globalThis.dbInstance` from `any` to `DatabaseType | undefined` using imported `better-sqlite3` type
+- Status: ✅ Complete
+
+#### Task 17.10: RBAC & Concurrency Test Suite
+- Added `src/app/actions/__tests__/rbac_and_concurrency.test.ts` with 8 tests
+- RBAC: verifies `checkManagerRole()` allows Admin/Manager and denies Cashier/Viewer; tests `createUser` authorization
+- Concurrency: 5 parallel `processCheckout` calls against stock of 3 units — verifies only 3 succeed, final stock is 0
+- Status: ✅ Complete
+
 ---
 
-## Current Project Health (as of Phase 16)
-- **Test Suites:** 11 (8 server action + 3 component)
-- **Tests:** 29, all passing
+## Current Project Health (as of Phase 17)
+- **Test Suites:** 13 (10 server action + 3 component)
+- **Tests:** 41, all passing
 - **TypeScript:** `tsc --noEmit` clean
-- **Security:** Zero known vulnerabilities, zero hardcoded credentials, inactivity auto-lock, backup dry-runs, input validation boundaries, header-based IP tracking, LAN secure cookie toggle, DoS-safe PBKDF2 manager override checks, secure PRNG bootstrap PINs.
+- **Security:** Zero known vulnerabilities. `Math.random()` eliminated from all security-sensitive paths. All catch blocks use `unknown` type narrowing. All form labels have `htmlFor`/`id` associations. No stray UI toasts. React key warnings resolved. RBAC enforcement tested. Parallel stock-deduction concurrency tested.
 - **Migrations:** 5 SQL migrations, 1 programmatic JS migration
 - **Server Actions:** 10, all with structured error returns
-- **Components:** 20
-- **Shared Libraries:** 10
+- **Components:** 22 (including UI primitives)
+- **Receipt:** A6 portrait (105×148mm), 5-column ruled table, underline fields, signatures footer, 6mm margins
+- **Shared Libraries:** 11 (including workers)

@@ -172,8 +172,8 @@ export async function updateCostPrice(_ignoredUserId: string, itemId: string, ne
     `).run(crypto.randomUUID(), userId, parsed.itemId, String(old.cost_price), String(parsed.newCostCentavos));
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
   }
 }
 
@@ -195,7 +195,7 @@ export async function overrideCreditLimit(_ignoredUserId: string, customerId: st
     `).run(crypto.randomUUID(), userId, parsed.customerId, String(old.credit_limit), String(parsed.newLimitCentavos));
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Operation failed.' };
   }
 }

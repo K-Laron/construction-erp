@@ -15,7 +15,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
 | Fonts       | Fira Sans (body), Fira Code (heading/mono)
-| Testing     | Vitest (12 suites, 33 tests)        |
+| Testing     | Vitest (13 suites, 41 tests)        |
 | Logging     | Structured logger (JSON, level-filtered)  |
 | Health      | `/api/health` endpoint              |
 
@@ -34,7 +34,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 
 - **Local-first & offline-capable** — SQLite database, no internet required, installable as a PWA
 - **High-contrast daylight readability** — Data-dense dashboard with light/dark mode, optimized for outdoor/warehouse environments
-- **A5 landscape print engine** — Receipt generation for thermal and standard printers
+- **A6 portrait print engine** — Receipt generation for thermal and standard printers (1/4 A4 size)
 - **Structured error handling** — All server actions return `{ success, data, error }`; `ErrorBoundary` component for UI crash isolation
 - **Health monitoring** — `/api/health` endpoint with DB, MLEK, migration, and shift checks
 - **Graceful shutdown** — SIGTERM/SIGINT handler ensures clean DB closure
@@ -43,13 +43,14 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 ## Security
 
 > [!IMPORTANT]
-> 10 rounds of comprehensive security audits completed. All High, Medium, and Low severity findings resolved. Zero known security vulnerabilities.
+> 11 rounds of comprehensive security audits completed. Zero known security vulnerabilities. All catch blocks use `unknown` type with `instanceof Error` narrowing. All form labels have `htmlFor`/`id` associations.
 
 ### Authentication & Access Control
 
 - **RBAC** with three roles: Cashier, Manager, Admin
 - **PBKDF2-SHA512 key derivation** — 100K iterations (DOP), 600K iterations (MMP/PIN)
 - **Cryptographically random admin PIN** generated on bootstrap (no hardcoded credentials)
+- **Cryptographically secure PRNG** for recovery mnemonic generation (`crypto.getRandomValues` instead of `Math.random`)
 - **System daemon** seeded with a random unreachable hash
 - **Rate-limited authentication** with IP and account lockouts (transactional)
 - **Session cookies** via iron-session with enforced production password
@@ -100,7 +101,7 @@ src/
 │   ├── inventory/      # Stock management UI
 │   ├── maintenance/    # System maintenance UI
 │   ├── pos/            # Point-of-sale UI
-│   ├── print/          # A5 receipt engine
+│   ├── print/          # A6 receipt engine
 │   ├── reports/        # Reporting dashboards
 │   └── ui/             # Shared UI primitives
 │
@@ -115,11 +116,11 @@ src/
 
 ## Testing
 
-**12 test suites · 33 tests · all passing · tsc --noEmit clean**
+**13 test suites · 41 tests · all passing · tsc --noEmit clean**
 
 All tests run against in-memory SQLite with the full migration suite applied. Worker threads gracefully fall back to inline queries for in-memory databases.
 
-### Server Action Tests (9 suites)
+### Server Action Tests (10 suites)
 
 | Suite                     | Coverage                                               |
 | ------------------------- | ------------------------------------------------------ |
@@ -132,6 +133,7 @@ All tests run against in-memory SQLite with the full migration suite applied. Wo
 | `deliveries`              | Dispatch validation                                    |
 | `production_hardening`    | MLEK inactivity auto-lock, Zod validation boundaries, backup integrity dry-run |
 | `production_hardening_v2` | Targeted overrides, passive check timer tests, backup restore validation |
+| `rbac_and_concurrency`    | RBAC enforcement (Cashier/Viewer/Admin), parallel stock-deduction safety |
 
 ### Component Tests (3 suites)
 

@@ -197,7 +197,7 @@ html {
 
 /* ── Print styles ──────────────────────────────────────────────────── */
 @media print {
-  @page { size: A5 landscape; margin: 8mm; }
+  @page { size: A6; margin: 6mm; }
   .no-print { display: none !important; }
   body { background: #fff !important; color: #000 !important; font-size: 10pt; }
   .glass-panel, .glass-panel-dense {

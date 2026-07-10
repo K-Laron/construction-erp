@@ -9,17 +9,21 @@
 
 ## Executive Summary
 
-This document records every finding identified during the multi-phase security and quality audit of the Construction Supply ERP system. A total of **50+ discrete issues** were discovered, triaged by severity, and resolved across eight audit phases. The system now passes all automated checks:
+This document records every finding identified during the multi-phase security and quality audit of the Construction Supply ERP system. A total of **60+ discrete issues** were discovered, triaged by severity, and resolved across eleven audit phases. The system now passes all automated checks:
 
 | Metric | Status |
 |---|---|
-| Test Suites | **10 suites, 20 tests — ALL PASSING** ✅ |
+| Test Suites | **13 suites, 41 tests — ALL PASSING** ✅ |
 | TypeScript | **`tsc --noEmit` — CLEAN** ✅ |
 | ESLint | **Configured and passing** ✅ |
 | Hardcoded Credentials | **Zero** ✅ |
 | Known Security Vulnerabilities | **Zero** ✅ |
 | Encrypted Data Key Derivation | **All use derived keys** ✅ |
 | Ledger Integrity | **HMAC-chained with timestamps** ✅ |
+| catch clauses | **All use `unknown` with `instanceof Error` narrowing** ✅ |
+| Form labels | **All have `htmlFor`/`id` associations** ✅ |
+| RBAC tests | **Cashier/Viewer/Admin enforcement tested** ✅ |
+| Concurrency tests | **Parallel stock-deduction safety tested** ✅ |
 
 ---
 
@@ -173,7 +177,7 @@ This document records every finding identified during the multi-phase security a
 ## Appendix: Finding Count by Severity and Phase
 
 | Phase | 🔴 Critical | 🟠 High | 🟡 Medium | 🔵 Low/Refactor | Total |
-|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|
 | 1–3 | 0 | 5 | 2 | 2 | 9 |
 | 4 | 2 | 2 | 2 | 0 | 6 |
 | 5 | 0 | 0 | 0 | 12 | 12 |
@@ -182,7 +186,8 @@ This document records every finding identified during the multi-phase security a
 | 9 (Production) | 0 | 1 | 1 | 2 | 4 |
 | 10 (Concurrency) | 0 | 2 | 2 | 2 | 6 |
 | 11 (Auto-lock/Crypt) | 0 | 2 | 1 | 1 | 4 |
-| **Total** | **2** | **15** | **14** | **27** | **58** |
+| 12 (Phase 11 remediation) | 1 | 1 | 3 | 3 | 8 |
+| **Total** | **3** | **16** | **17** | **31** | **67** |
 
 ---
 

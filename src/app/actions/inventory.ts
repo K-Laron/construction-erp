@@ -92,8 +92,8 @@ export async function deactivateProduct(id: string): Promise<{ success: boolean;
     const info = db.prepare("UPDATE inventory SET is_active = 0 WHERE id = ?").run(parsed.id);
     if (info.changes === 0) throw new Error("Product not found");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to deactivate product.' };
   }
 }
 
