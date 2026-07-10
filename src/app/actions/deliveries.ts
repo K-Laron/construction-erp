@@ -2,6 +2,7 @@
 
 import db from '@/lib/db';
 import crypto from 'crypto';
+import { getActiveUserId } from './auth';
 
 function checkMlek(): void {
   if (!(global as any).mlekSecret) {
@@ -57,6 +58,7 @@ export async function dispatchDelivery(
   helperWorkerIds: string[] = []
 ): Promise<string> {
   checkMlek();
+  const userId = await getActiveUserId();
 
   const deliveryId = crypto.randomUUID();
 
@@ -107,8 +109,8 @@ export async function dispatchDelivery(
     // 5. Audit log
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, datetime('now'), NULL, 'DELIVERY_DISPATCH', ?, NULL, ?)
-    `).run(crypto.randomUUID(), deliveryId, `Driver: ${driverName}, Plate: ${truckPlate}, Items: ${items.length}`);
+      VALUES (?, datetime('now'), ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
+    `).run(crypto.randomUUID(), userId, deliveryId, `Driver: ${driverName}, Plate: ${truckPlate}, Items: ${items.length}`);
   })();
 
   return deliveryId;

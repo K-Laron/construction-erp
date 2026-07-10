@@ -2,16 +2,25 @@
 
 import db from '@/lib/db';
 import crypto from 'crypto';
+import { getSession } from '@/lib/session';
 
 function checkMlek(): void {
   if (!(global as any).mlekSecret) throw new Error("DATABASE_LOCKED: Store is locked.");
 }
 
-function checkManagerRole(userId: string): void {
+export async function getActiveUserId(): Promise<string> {
+  const session = await getSession();
+  if (!session.userId) throw new Error("UNAUTHORIZED: Not logged in.");
+  return session.userId;
+}
+
+export async function checkManagerRole(): Promise<string> {
+  const userId = await getActiveUserId();
   const user = db.prepare("SELECT role FROM users WHERE id = ? AND is_active = 1").get(userId) as { role: string } | undefined;
   if (!user || (user.role !== 'Manager' && user.role !== 'Admin')) {
     throw new Error("RBAC_DENIED: This action requires Manager or Admin privileges.");
   }
+  return userId;
 }
 
 // Authenticate user via PIN
@@ -56,6 +65,11 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
   db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 1)`)
     .run(crypto.randomUUID(), username, ipAddress, Date.now());
 
+  const session = await getSession();
+  session.userId = user.id;
+  session.role = user.role;
+  await session.save();
+
   return {
     success: true,
     user: { id: user.id, username: user.username, name: user.name, role: user.role }
@@ -64,14 +78,14 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
 
 // Create a new user (Manager/Admin only)
 export async function createUser(
-  createdBy: string,
+  _ignoredCreatedBy: string,
   username: string,
   name: string,
   role: 'Cashier' | 'Manager' | 'Admin',
   pin: string
 ): Promise<string> {
   checkMlek();
-  checkManagerRole(createdBy);
+  const createdBy = await checkManagerRole();
 
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(pin, salt, 600000, 32, 'sha512').toString('hex');
@@ -96,9 +110,9 @@ export async function getUsers(): Promise<any[]> {
 }
 
 // Update cost price (Manager/Admin + MLEK required)
-export async function updateCostPrice(userId: string, itemId: string, newCostCentavos: number): Promise<void> {
+export async function updateCostPrice(_ignoredUserId: string, itemId: string, newCostCentavos: number): Promise<void> {
   checkMlek();
-  checkManagerRole(userId);
+  const userId = await checkManagerRole();
 
   const old = db.prepare("SELECT cost_price FROM inventory WHERE id = ?").get(itemId) as { cost_price: number };
   db.prepare("UPDATE inventory SET cost_price = ? WHERE id = ?").run(newCostCentavos, itemId);
@@ -110,9 +124,9 @@ export async function updateCostPrice(userId: string, itemId: string, newCostCen
 }
 
 // Override credit limit (Manager/Admin + MLEK required)
-export async function overrideCreditLimit(userId: string, customerId: string, newLimitCentavos: number): Promise<void> {
+export async function overrideCreditLimit(_ignoredUserId: string, customerId: string, newLimitCentavos: number): Promise<void> {
   checkMlek();
-  checkManagerRole(userId);
+  const userId = await checkManagerRole();
 
   const old = db.prepare("SELECT credit_limit FROM customers WHERE id = ?").get(customerId) as { credit_limit: number };
   db.prepare("UPDATE customers SET credit_limit = ? WHERE id = ?").run(newLimitCentavos, customerId);

@@ -55,7 +55,8 @@ export async function runMigrations(mlekSecret?: string) {
       // Run the JS/TS module migration function using manual transaction boundary for async support
       db.prepare('BEGIN').run();
       try {
-        const requireFunc = eval('require');
+        // @ts-ignore
+        const requireFunc = typeof __webpack_require__ === "function" ? __non_webpack_require__ : require;
         const migration = requireFunc(migrationPath);
         const migrateFn = typeof migration === 'function' ? migration : migration.default;
         await migrateFn(db, mlekSecret);

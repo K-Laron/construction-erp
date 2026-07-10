@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from './ledger';
 import { z } from 'zod';
+import { getActiveUserId } from './auth';
 
 export interface CartItem {
   itemId: string;
@@ -41,8 +42,7 @@ const CartItemSchema = z.object({
 
 export const CheckoutPayloadSchema = z.object({
   customerId: z.string().nullable(),
-  cashierId: z.string(),
-  items: z.array(CartItemSchema).min(1),
+  items: z.array(CartItemSchema).min(1, "Cart cannot be empty"),
   subtotal: z.number().int().nonnegative(),
   tax: z.number().int().nonnegative(),
   deliveryFee: z.number().int().nonnegative(),
@@ -64,9 +64,11 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
 
   const payload = CheckoutPayloadSchema.parse(rawPayload);
   let {
-    customerId, cashierId, items, subtotal, tax,
+    customerId, items, subtotal, tax,
     deliveryFee, discount, totalAmount, amountPaid, paymentMethod
   } = payload;
+  
+  const cashierId = await getActiveUserId();
 
   let computedSubtotal = 0;
   for (let i = 0; i < items.length; i++) {
@@ -78,8 +80,15 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     computedSubtotal += items[i].totalPrice;
   }
   
-  subtotal = computedSubtotal;
-  totalAmount = subtotal - discount + tax + deliveryFee;
+  if (subtotal !== computedSubtotal) {
+    throw new Error("MATH_TAMPERING_DETECTED: Submitted subtotal does not match calculated line items.");
+  }
+  
+  const computedTotal = subtotal - discount + tax + deliveryFee;
+  if (totalAmount !== computedTotal) {
+    throw new Error("MATH_TAMPERING_DETECTED: Submitted total amount does not match calculated total.");
+  }
+
   if (totalAmount < 0) throw new Error("Total amount cannot be negative.");
 
   // Credit limit enforcement
@@ -239,9 +248,10 @@ export async function getTransactionDetails(transactionId: string): Promise<any>
 export async function processReturn(
   transactionId: string,
   itemsToReturn: { itemId: string; quantity: number }[],
-  processedBy: string
+  _ignoredProcessedBy: string
 ): Promise<void> {
   checkMlek();
+  const processedBy = await getActiveUserId();
 
   db.transaction(() => {
     const tx = db.prepare("SELECT payment_method, balance_due, customer_id FROM transactions WHERE id = ?").get(transactionId) as { payment_method: string; balance_due: number; customer_id: string | null };

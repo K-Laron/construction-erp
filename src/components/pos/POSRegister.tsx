@@ -161,6 +161,14 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
                 <div
                   key={item.id}
                   onClick={() => handleAddToCart(item)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleAddToCart(item);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                   className={`p-5 rounded-2xl glass-panel-dense cursor-pointer btn-hover-fx flex flex-col justify-between group ${
                     lowStock ? 'border-error-500/30 hover:border-error-400/50 shadow-[0_0_15px_rgba(255,59,48,0.05)]' : 'hover:border-interactive-600/30'
                   }`}

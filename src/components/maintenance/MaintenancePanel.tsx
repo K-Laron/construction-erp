@@ -79,7 +79,12 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
     try {
       const result = await exportEncryptedBackup();
       if (result.success && result.data && result.filename) {
-        const blob = new Blob([Buffer.from(result.data, 'base64')], { type: 'application/octet-stream' });
+        const binaryString = atob(result.data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/octet-stream' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

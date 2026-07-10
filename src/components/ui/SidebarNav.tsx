@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { lockStoreAction } from "@/app/actions/store";
 
 interface SidebarNavProps {
   activeView: string;
@@ -113,6 +114,10 @@ export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) 
       {/* ── Lock store button ────────────────────────── */}
       <div className="shrink-0 border-t border-surface-800 p-2">
         <button
+          onClick={async () => {
+            await lockStoreAction();
+            window.location.reload();
+          }}
           title={!expanded ? "Lock Store" : undefined}
           className={twMerge(
             clsx(

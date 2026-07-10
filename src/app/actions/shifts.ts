@@ -2,6 +2,7 @@
 
 import db from '@/lib/db';
 import crypto from 'crypto';
+import { getActiveUserId } from './auth';
 
 function checkMlek(): void {
   if (!(global as any).mlekSecret) {
@@ -10,8 +11,9 @@ function checkMlek(): void {
 }
 
 // Open a new cashier shift
-export async function openShift(cashierId: string, openingFloat: number): Promise<string> {
+export async function openShift(_ignoredCashierId: string, openingFloat: number): Promise<string> {
   checkMlek();
+  const cashierId = await getActiveUserId();
 
   // Only one open shift per cashier
   const existing = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) as { id: string } | undefined;
@@ -95,8 +97,9 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
 }
 
 // Get the current open shift for a cashier
-export async function getCurrentShift(cashierId: string): Promise<any | null> {
+export async function getCurrentShift(_ignoredCashierId: string): Promise<any | null> {
   checkMlek();
+  const cashierId = await getActiveUserId();
   return db.prepare("SELECT * FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) || null;
 }
 

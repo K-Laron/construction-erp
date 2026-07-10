@@ -19,11 +19,11 @@ function checkMlek(): void {
 }
 
 // General Ledger Transaction: enforces sum(debits) = sum(credits)
-export async function createBalancedJournalEntry(
+export function createBalancedJournalEntry(
   description: string,
   lines: JournalLineInput[],
   createdBy: string = 'system-daemon'
-): Promise<string> {
+): string {
   checkMlek();
 
   const totalDebits = lines.filter(l => l.type === 'DEBIT').reduce((sum, l) => sum + l.amount, 0);

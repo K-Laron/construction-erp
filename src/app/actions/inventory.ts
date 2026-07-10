@@ -4,6 +4,8 @@ import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
 import { InventoryItem, Supplier } from '@/types';
 import crypto from 'crypto';
+import { createBalancedJournalEntry } from './ledger';
+import { getActiveUserId } from './auth';
 
 // Helper to check for MLEK
 function getMlekSecret(): Buffer {
@@ -130,8 +132,9 @@ export async function createPurchaseOrder(
 }
 
 // Receive Goods & Update Weighted Average Cost (WAC)
-export async function receiveGoods(purchaseOrderId: string, receivedBy: string): Promise<string> {
+export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: string): Promise<string> {
   getMlekSecret();
+  const receivedBy = await getActiveUserId();
   const receiptId = crypto.randomUUID();
 
   db.transaction(() => {
