@@ -52,9 +52,15 @@ export async function createProduct(
 }
 
 // Soft delete product
-export async function deactivateProduct(id: string): Promise<void> {
-  getMlekSecret(); // Ensure unlocked
-  db.prepare("UPDATE inventory SET is_active = 0 WHERE id = ?").run(id);
+export async function deactivateProduct(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    getMlekSecret(); // Ensure unlocked
+    const info = db.prepare("UPDATE inventory SET is_active = 0 WHERE id = ?").run(id);
+    if (info.changes === 0) throw new Error("Product not found");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 // Fetch active suppliers

@@ -57,9 +57,15 @@ export async function createCustomer(
 }
 
 // Soft delete customer
-export async function deactivateCustomer(customerId: string): Promise<void> {
-  getMlekSecret(); // Ensure unlocked
-  db.prepare("UPDATE customers SET is_active = 0 WHERE id = ?").run(customerId);
+export async function deactivateCustomer(customerId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    getMlekSecret(); // Ensure unlocked
+    const info = db.prepare("UPDATE customers SET is_active = 0 WHERE id = ?").run(customerId);
+    if (info.changes === 0) throw new Error("Customer not found");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 // Retrieve customer ledger and check HMAC signature validity
