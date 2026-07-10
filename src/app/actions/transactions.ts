@@ -4,6 +4,7 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from './ledger';
+import { z } from 'zod';
 
 export interface CartItem {
   itemId: string;
@@ -28,6 +29,29 @@ export interface CheckoutPayload {
   paymentMethod: 'Cash' | 'Credit' | 'Check';
 }
 
+const CartItemSchema = z.object({
+  itemId: z.string(),
+  name: z.string(),
+  quantity: z.number().int().positive(),
+  unitUsed: z.string(),
+  unitPrice: z.number().int().nonnegative(),
+  unitCost: z.number().int().nonnegative(),
+  totalPrice: z.number().int().nonnegative()
+});
+
+export const CheckoutPayloadSchema = z.object({
+  customerId: z.string().nullable(),
+  cashierId: z.string(),
+  items: z.array(CartItemSchema).min(1),
+  subtotal: z.number().int().nonnegative(),
+  tax: z.number().int().nonnegative(),
+  deliveryFee: z.number().int().nonnegative(),
+  discount: z.number().int().nonnegative(),
+  totalAmount: z.number().int().nonnegative(),
+  amountPaid: z.number().int().nonnegative(),
+  paymentMethod: z.enum(['Cash', 'Credit', 'Check'])
+});
+
 function checkMlek(): void {
   if (!(global as any).mlekSecret) {
     throw new Error("DATABASE_LOCKED: Store is locked.");
@@ -35,13 +59,28 @@ function checkMlek(): void {
 }
 
 // Main checkout action
-export async function processCheckout(payload: CheckoutPayload): Promise<{ transactionId: string; siNumber: number | null; orNumber: number | null }> {
+export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ transactionId: string; siNumber: number | null; orNumber: number | null }> {
   checkMlek();
 
-  const {
+  const payload = CheckoutPayloadSchema.parse(rawPayload);
+  let {
     customerId, cashierId, items, subtotal, tax,
     deliveryFee, discount, totalAmount, amountPaid, paymentMethod
   } = payload;
+
+  let computedSubtotal = 0;
+  for (let i = 0; i < items.length; i++) {
+    const invItem = db.prepare("SELECT cost_price FROM inventory WHERE id = ?").get(items[i].itemId) as { cost_price: number };
+    if (!invItem) throw new Error(`Item ${items[i].itemId} not found.`);
+    
+    items[i].unitCost = invItem.cost_price;
+    items[i].totalPrice = Math.round(items[i].unitPrice * items[i].quantity / 1000);
+    computedSubtotal += items[i].totalPrice;
+  }
+  
+  subtotal = computedSubtotal;
+  totalAmount = subtotal - discount + tax + deliveryFee;
+  if (totalAmount < 0) throw new Error("Total amount cannot be negative.");
 
   // Credit limit enforcement
   if (paymentMethod === 'Credit' && customerId) {
@@ -205,14 +244,24 @@ export async function processReturn(
   checkMlek();
 
   db.transaction(() => {
+    const tx = db.prepare("SELECT payment_method, balance_due, customer_id FROM transactions WHERE id = ?").get(transactionId) as { payment_method: string; balance_due: number; customer_id: string | null };
+    if (!tx) throw new Error("Transaction not found.");
+
     for (const item of itemsToReturn) {
+      const origItem = db.prepare(`
+        SELECT quantity, quantity_returned, unit_price, unit_cost FROM transaction_items WHERE transaction_id = ? AND item_id = ?
+      `).get(transactionId, item.itemId) as { quantity: number; quantity_returned: number | null; unit_price: number; unit_cost: number };
+
+      if (!origItem) throw new Error("Item not found in transaction.");
+      const returnedSoFar = origItem.quantity_returned || 0;
+      if (returnedSoFar + item.quantity > origItem.quantity) {
+        throw new Error("Cannot return more than originally purchased or already returned.");
+      }
+
+      db.prepare("UPDATE transaction_items SET quantity_returned = ? WHERE transaction_id = ? AND item_id = ?").run(returnedSoFar + item.quantity, transactionId, item.itemId);
+
       // Restock inventory
       db.prepare("UPDATE inventory SET stock_quantity = stock_quantity + ? WHERE id = ?").run(item.quantity, item.itemId);
-
-      // Get original item cost for COGS reversal
-      const origItem = db.prepare(`
-        SELECT unit_price, unit_cost FROM transaction_items WHERE transaction_id = ? AND item_id = ?
-      `).get(transactionId, item.itemId) as { unit_price: number; unit_cost: number };
 
       if (origItem) {
         const refundAmount = Math.round(origItem.unit_price * item.quantity / 1000);
@@ -223,7 +272,30 @@ export async function processReturn(
 
         if (refundAmount > 0) {
           glLines.push({ accountId: 'acc-revenue', type: 'DEBIT', amount: refundAmount });
-          glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: refundAmount });
+          if (tx.payment_method === 'Credit' && tx.balance_due > 0) {
+            const actualCreditRefund = Math.min(refundAmount, tx.balance_due);
+            const remainderCashRefund = refundAmount - actualCreditRefund;
+            
+            glLines.push({ accountId: 'acc-ar', type: 'CREDIT', amount: actualCreditRefund });
+            if (remainderCashRefund > 0) {
+              glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: remainderCashRefund });
+            }
+
+            if (tx.customer_id) {
+              db.prepare("UPDATE customers SET current_balance = MAX(0, current_balance - ?) WHERE id = ?").run(actualCreditRefund, tx.customer_id);
+              db.prepare("UPDATE transactions SET balance_due = MAX(0, balance_due - ?) WHERE id = ?").run(actualCreditRefund, transactionId);
+              tx.balance_due -= actualCreditRefund; // update local var for next loop iteration
+              
+              const lastLedger = db.prepare(`SELECT hmac_signature FROM customer_ledger WHERE customer_id = ? ORDER BY date DESC LIMIT 1`).get(tx.customer_id) as { hmac_signature: string } | undefined;
+              const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
+              const ledgerId = crypto.randomUUID();
+              const entryData = { id: ledgerId, customer_id: tx.customer_id, date: new Date().toISOString(), type: 'CREDIT' as const, amount: actualCreditRefund, reference_id: transactionId, description: `Return on Txn ${transactionId.slice(0, 8)}` };
+              const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
+              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature) VALUES (?, ?, datetime('now'), 'CREDIT', ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, actualCreditRefund, transactionId, entryData.description, signature);
+            }
+          } else {
+            glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: refundAmount });
+          }
         }
         if (costRefund > 0) {
           glLines.push({ accountId: 'acc-inv', type: 'DEBIT', amount: costRefund });

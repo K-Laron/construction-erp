@@ -74,7 +74,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
       // Seed default admin user (username: admin, PIN: 123456 stretched)
       const adminSalt = crypto.randomBytes(16).toString('hex');
       // PIN 123456 pbkdf2 hash
-      const adminHash = crypto.pbkdf2Sync('123456', adminSalt, 10000, 32, 'sha512').toString('hex');
+      const adminHash = crypto.pbkdf2Sync('123456', adminSalt, 600000, 32, 'sha512').toString('hex');
 
       db.prepare(`
         INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system)
@@ -111,15 +111,6 @@ export async function unlockStore(dop: string, ipAddress: string = '127.0.0.1'):
     return { success: false, error: "IP temporarily locked out. Try again in 5 minutes." };
   }
 
-  // 2. Global Unlock Lockout Throttling Check
-  const globalFailCount = db.prepare(`
-    SELECT COUNT(*) as count FROM login_attempts 
-    WHERE attempt_type = 'DOP' AND is_successful = 0 AND timestamp > ?
-  `).get(timeframe15Min) as { count: number };
-
-  if (globalFailCount.count >= 5) {
-    return { success: false, error: "DOP unlock temporarily locked out globally. Try again in 15 minutes." };
-  }
 
   try {
     const dopConfig = db.prepare("SELECT value FROM system_config WHERE key = 'mlek_encrypted_dop'").get() as { value: string };
@@ -184,15 +175,6 @@ export async function recoverStore(mnemonicWords: string[], newDop: string, ipAd
     return { success: false, error: "IP temporarily locked out from recovery. Try again in 5 minutes." };
   }
 
-  // Global Lockout check
-  const globalFailCount = db.prepare(`
-    SELECT COUNT(*) as count FROM login_attempts 
-    WHERE attempt_type = 'MMP' AND is_successful = 0 AND timestamp > ?
-  `).get(timeframe15Min) as { count: number };
-
-  if (globalFailCount.count >= 5) {
-    return { success: false, error: "Recovery endpoint temporarily locked out globally. Try again in 15 minutes." };
-  }
 
   try {
     const mmpConfig = db.prepare("SELECT value FROM system_config WHERE key = 'mlek_encrypted_mmp'").get() as { value: string };

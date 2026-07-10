@@ -45,7 +45,7 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
     return { success: false, error: "Invalid username or PIN." };
   }
 
-  const pinHash = crypto.pbkdf2Sync(pin, user.passcode_salt, 10000, 32, 'sha512').toString('hex');
+  const pinHash = crypto.pbkdf2Sync(pin, user.passcode_salt, 600000, 32, 'sha512').toString('hex');
 
   if (pinHash !== user.passcode_hash) {
     db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 0)`)
@@ -74,7 +74,7 @@ export async function createUser(
   checkManagerRole(createdBy);
 
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(pin, salt, 10000, 32, 'sha512').toString('hex');
+  const hash = crypto.pbkdf2Sync(pin, salt, 600000, 32, 'sha512').toString('hex');
   const userId = crypto.randomUUID();
 
   db.prepare(`

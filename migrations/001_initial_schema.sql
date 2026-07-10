@@ -186,6 +186,7 @@ CREATE TABLE IF NOT EXISTS transaction_items (
   transaction_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK(quantity > 0), -- Millicounts
+  quantity_returned INTEGER DEFAULT 0 CHECK(quantity_returned >= 0),
   unit_used TEXT NOT NULL,
   unit_price INTEGER NOT NULL,
   unit_cost INTEGER NOT NULL CHECK(unit_cost >= 0),
@@ -300,7 +301,7 @@ CREATE TABLE IF NOT EXISTS timecards (
   id TEXT PRIMARY KEY,
   worker_id TEXT NOT NULL,
   date TEXT NOT NULL,
-  hours_worked REAL NOT NULL CHECK(hours_worked >= 0),
+  minutes_worked INTEGER NOT NULL CHECK(minutes_worked >= 0),
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 );
 

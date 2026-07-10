@@ -71,7 +71,7 @@ To prevent online brute-forcing of cashier PINs, the Daily Passphrase (DOP), and
 - **Attempt Types**: Logged via an explicit check constraint: `attempt_type IN ('PIN', 'DOP', 'MMP')`.
 - **Throttling Windows**:
   - **Single IP Lockout**: If a client IP address generates 3 failed attempts (of any type) within a 5-minute window, that specific IP is blocked from accessing the auth, unlock, and recovery endpoints for 5 minutes (preventing local network DoS attacks targeting registers).
-  - **Account/System Lockout**: If a PIN account, the DOP unlock page, or the MMP recovery page gets 5 failures across any IP within a 15-minute window, access is locked for 15 minutes.
+  - **Account Lockout (PIN Only)**: If a specific PIN account gets 5 failures within a 15-minute window (from any IP), that account is locked for 15 minutes. Note: Store unlock and recovery do not use global lockouts to prevent unauthenticated local network DoS attacks.
 - **Failed Unlock Audits**:
   - Every failed DOP or MMP entry is recorded as a high-priority `STORE_UNLOCK_FAILED` or `STORE_RECOVERY_FAILED` action in the system audit log.
   - Upon next successful boot/login, the dashboard displays a persistent warning banner if failed unlock attempts occurred.
@@ -392,6 +392,7 @@ CREATE TABLE IF NOT EXISTS transaction_items (
   transaction_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK(quantity > 0), -- Millicounts
+  quantity_returned INTEGER DEFAULT 0 CHECK(quantity_returned >= 0),
   unit_used TEXT NOT NULL,
   unit_price INTEGER NOT NULL, -- Centavos (selling price)
   unit_cost INTEGER NOT NULL CHECK(unit_cost >= 0), -- Centavos (snapshotted inventory cost_price)
@@ -492,7 +493,7 @@ CREATE TABLE IF NOT EXISTS timecards (
   id TEXT PRIMARY KEY,
   worker_id TEXT NOT NULL,
   date TEXT NOT NULL,
-  hours_worked REAL NOT NULL CHECK(hours_worked >= 0),
+  minutes_worked INTEGER NOT NULL CHECK(minutes_worked >= 0),
   FOREIGN KEY (worker_id) REFERENCES workers(id) ON DELETE CASCADE
 );
 

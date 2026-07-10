@@ -27,7 +27,7 @@ Build a desktop-first, local-first management suite to operate a complete small-
 - **Description**: Install core production and development packages.
 - **Action**: Run installation command:
   ```bash
-  npm install better-sqlite3 lucide-react clsx tailwind-merge
+  npm install better-sqlite3 lucide-react clsx tailwind-merge zod
   npm install -D @types/better-sqlite3
   ```
 - **Approval Metrics**:
@@ -106,8 +106,8 @@ Build a desktop-first, local-first management suite to operate a complete small-
 #### Task 2.3: Lockout rate limit checks
 - **Description**: Implement rate limiting on both PIN checkout, DOP unlock, and MMP recovery endpoints.
 - **Throttling rules**:
-  - 3 failures in 5 min locks the client IP for 5 min.
-  - 5 failures in 15 min locks the account globally for 15 min.
+  - 3 failures in 5 min locks the client IP for 5 min (all endpoints).
+  - 5 failures in 15 min locks the PIN account globally for 15 min. (Unlock and recovery endpoints rely solely on IP throttling to prevent global local-network DoS attacks).
 - **Approval Metrics**:
   1. Generating 3 failed requests from the same IP blocks the next request with a 429 status.
   2. Generating 5 global failures locks the screen for 15 minutes.
