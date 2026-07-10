@@ -4,7 +4,25 @@ import db from '@/lib/db';
 import crypto from 'crypto';
 import { getSession } from '@/lib/session';
 import { checkMlek } from "@/lib/mlek";
+import { z } from 'zod';
+import { headers } from 'next/headers';
 
+const CreateUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters long"),
+  name: z.string().min(1, "Name is required"),
+  role: z.enum(['Cashier', 'Manager', 'Admin']),
+  pin: z.string().min(6, "PIN must be at least 6 characters long")
+});
+
+const UpdateCostPriceSchema = z.object({
+  itemId: z.string().uuid(),
+  newCostCentavos: z.number().int().nonnegative()
+});
+
+const OverrideCreditLimitSchema = z.object({
+  customerId: z.string().uuid(),
+  newLimitCentavos: z.number().int().nonnegative()
+});
 
 export async function getActiveUserId(): Promise<string> {
   const session = await getSession();
@@ -22,7 +40,17 @@ export async function checkManagerRole(): Promise<string> {
 }
 
 // Authenticate user via PIN
-export async function authenticateUser(username: string, pin: string, ipAddress: string = '127.0.0.1'): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
+export async function authenticateUser(username: string, pin: string, providedIp?: string): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
+  let ipAddress = providedIp;
+  if (!ipAddress) {
+    try {
+      const h = await headers();
+      ipAddress = h.get('x-forwarded-for') || '127.0.0.1';
+    } catch {
+      ipAddress = '127.0.0.1';
+    }
+  }
+
   const timeframe5Min = Date.now() - 300000;
   const timeframe15Min = Date.now() - 900000;
 
@@ -57,7 +85,7 @@ export async function authenticateUser(username: string, pin: string, ipAddress:
 
     // Pessimistically log a failure to prevent concurrent bypass during slow hashing
     db.prepare(`INSERT INTO login_attempts (id, attempt_type, username, ip_address, timestamp, is_successful) VALUES (?, 'PIN', ?, ?, ?, 0)`)
-      .run(attemptId, username, ipAddress, Date.now());
+        .run(attemptId, username, ipAddress, Date.now());
 
     return { success: true, user };
   });
@@ -95,29 +123,30 @@ export async function createUser(
   name: string,
   role: 'Cashier' | 'Manager' | 'Admin',
   pin: string
-): Promise<string> {
-  checkMlek();
-  const createdBy = await checkManagerRole();
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    const parsed = CreateUserSchema.parse({ username, name, role, pin });
+    checkMlek();
+    const createdBy = await checkManagerRole();
 
-  if (!pin || pin.length < 6) {
-    throw new Error("PIN must be at least 6 characters long.");
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(parsed.pin, salt, 600000, 32, 'sha512').toString('hex');
+    const userId = crypto.randomUUID();
+
+    db.prepare(`
+      INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 0)
+    `).run(userId, parsed.username, parsed.name, parsed.role, hash, salt);
+
+    db.prepare(`
+      INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'USER_CREATED', ?, NULL, ?)
+    `).run(crypto.randomUUID(), createdBy, userId, `User ${parsed.username} created as ${parsed.role}`);
+
+    return { success: true, data: userId };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to create user' };
   }
-
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(pin, salt, 600000, 32, 'sha512').toString('hex');
-  const userId = crypto.randomUUID();
-
-  db.prepare(`
-    INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system)
-    VALUES (?, ?, ?, ?, ?, ?, 1, 0)
-  `).run(userId, username, name, role, hash, salt);
-
-  db.prepare(`
-    INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, CURRENT_TIMESTAMP, ?, 'USER_CREATED', ?, NULL, ?)
-  `).run(crypto.randomUUID(), createdBy, userId, `User ${username} created as ${role}`);
-
-  return userId;
 }
 
 // Get all active users
@@ -126,29 +155,47 @@ export async function getUsers(): Promise<{ id: string; username: string; name: 
 }
 
 // Update cost price (Manager/Admin + MLEK required)
-export async function updateCostPrice(_ignoredUserId: string, itemId: string, newCostCentavos: number): Promise<void> {
-  checkMlek();
-  const userId = await checkManagerRole();
+export async function updateCostPrice(_ignoredUserId: string, itemId: string, newCostCentavos: number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const parsed = UpdateCostPriceSchema.parse({ itemId, newCostCentavos });
+    checkMlek();
+    const userId = await checkManagerRole();
 
-  const old = db.prepare("SELECT cost_price FROM inventory WHERE id = ?").get(itemId) as { cost_price: number };
-  db.prepare("UPDATE inventory SET cost_price = ? WHERE id = ?").run(newCostCentavos, itemId);
+    const old = db.prepare("SELECT cost_price FROM inventory WHERE id = ?").get(parsed.itemId) as { cost_price: number } | undefined;
+    if (!old) throw new Error("Product not found");
 
-  db.prepare(`
-    INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, CURRENT_TIMESTAMP, ?, 'COST_PRICE_CHANGE', ?, ?, ?)
-  `).run(crypto.randomUUID(), userId, itemId, String(old.cost_price), String(newCostCentavos));
+    db.prepare("UPDATE inventory SET cost_price = ? WHERE id = ?").run(parsed.newCostCentavos, parsed.itemId);
+
+    db.prepare(`
+      INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'COST_PRICE_CHANGE', ?, ?, ?)
+    `).run(crypto.randomUUID(), userId, parsed.itemId, String(old.cost_price), String(parsed.newCostCentavos));
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 // Override credit limit (Manager/Admin + MLEK required)
-export async function overrideCreditLimit(_ignoredUserId: string, customerId: string, newLimitCentavos: number): Promise<void> {
-  checkMlek();
-  const userId = await checkManagerRole();
+export async function overrideCreditLimit(_ignoredUserId: string, customerId: string, newLimitCentavos: number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const parsed = OverrideCreditLimitSchema.parse({ customerId, newLimitCentavos });
+    checkMlek();
+    const userId = await checkManagerRole();
 
-  const old = db.prepare("SELECT credit_limit FROM customers WHERE id = ?").get(customerId) as { credit_limit: number };
-  db.prepare("UPDATE customers SET credit_limit = ? WHERE id = ?").run(newLimitCentavos, customerId);
+    const old = db.prepare("SELECT credit_limit FROM customers WHERE id = ?").get(parsed.customerId) as { credit_limit: number } | undefined;
+    if (!old) throw new Error("Customer not found");
 
-  db.prepare(`
-    INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, CURRENT_TIMESTAMP, ?, 'CREDIT_LIMIT_OVERRIDE', ?, ?, ?)
-  `).run(crypto.randomUUID(), userId, customerId, String(old.credit_limit), String(newLimitCentavos));
+    db.prepare("UPDATE customers SET credit_limit = ? WHERE id = ?").run(parsed.newLimitCentavos, parsed.customerId);
+
+    db.prepare(`
+      INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'CREDIT_LIMIT_OVERRIDE', ?, ?, ?)
+    `).run(crypto.randomUUID(), userId, parsed.customerId, String(old.credit_limit), String(parsed.newLimitCentavos));
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }

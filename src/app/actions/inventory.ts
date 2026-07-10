@@ -80,11 +80,16 @@ export async function createProduct(
   }
 }
 
+const DeactivateProductSchema = z.object({
+  id: z.string().uuid()
+});
+
 // Soft delete product
 export async function deactivateProduct(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const parsed = DeactivateProductSchema.parse({ id });
     getMlekSecret(); // Ensure unlocked
-    const info = db.prepare("UPDATE inventory SET is_active = 0 WHERE id = ?").run(id);
+    const info = db.prepare("UPDATE inventory SET is_active = 0 WHERE id = ?").run(parsed.id);
     if (info.changes === 0) throw new Error("Product not found");
     return { success: true };
   } catch (err: any) {

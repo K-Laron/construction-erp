@@ -9,8 +9,16 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
+declare global {
+  var dbInstance: any;
+}
+
 const dbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(dbDir, 'database.db');
-const db = new Database(dbPath);
+const db = globalThis.dbInstance || new Database(dbPath);
+
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+  globalThis.dbInstance = db;
+}
 
 // Configure WAL mode and concurrency locks
 db.pragma('journal_mode = WAL');

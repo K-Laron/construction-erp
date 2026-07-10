@@ -28,7 +28,7 @@ export const sessionOptions: SessionOptions = {
   password: sessionPassword,
   cookieName: 'construction_erp_session',
   cookieOptions: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.SESSION_SECURE === 'true' || (process.env.NODE_ENV === 'production' && process.env.SESSION_SECURE !== 'false'),
     sameSite: 'lax',
   },
   ttl: 28800,

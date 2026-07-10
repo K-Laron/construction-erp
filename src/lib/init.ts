@@ -2,19 +2,23 @@ import db, { runMigrations } from '@/lib/db';
 import { getMlekSecret, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
 import { logger } from '@/lib/logger';
 
-let initialized = false;
+let initPromise: Promise<void> | null = null;
 
-export async function initializeDatabase() {
-  if (initialized) return;
+export function initializeDatabase(): Promise<void> {
+  if (initPromise) return initPromise;
 
-  try {
-    await runMigrations();
-    initialized = true;
-    logger.info('Database initialized with WAL mode and migrations applied.');
-  } catch (error) {
-    logger.error('Failed to initialize database:', error);
-    throw error;
-  }
+  initPromise = (async () => {
+    try {
+      await runMigrations();
+      logger.info('Database initialized with WAL mode and migrations applied.');
+    } catch (error) {
+      logger.error('Failed to initialize database:', error);
+      initPromise = null; // Allow retry on subsequent attempts
+      throw error;
+    }
+  })();
+
+  return initPromise;
 }
 
 export function isStoreConfigured(): boolean {

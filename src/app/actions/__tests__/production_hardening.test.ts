@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getMlekSecret, setMlekSecret, isMlekUnlocked } from '@/lib/mlek';
 import { createCustomer } from '../customers';
-import { createProduct } from '../inventory';
+import { createProduct, deactivateProduct } from '../inventory';
 import { openShift } from '../shifts';
 import { exportEncryptedBackup } from '../backup';
+import { createUser, updateCostPrice, overrideCreditLimit } from '../auth';
 import crypto from 'crypto';
 
 describe('Production Hardening Features', () => {
@@ -40,6 +41,30 @@ describe('Production Hardening Features', () => {
 
     it('rejects invalid inputs on open shift', async () => {
       const res = await openShift('user_1', -100);
+      expect(res.success).toBe(false);
+      expect(res.error).toBeDefined();
+    });
+
+    it('rejects invalid inputs on user creation', async () => {
+      const res = await createUser('createdBy', 'ab', 'Test User', 'Cashier', '12345');
+      expect(res.success).toBe(false);
+      expect(res.error).toBeDefined();
+    });
+
+    it('rejects invalid inputs on update cost price', async () => {
+      const res = await updateCostPrice('user_1', 'invalid-uuid', -500);
+      expect(res.success).toBe(false);
+      expect(res.error).toBeDefined();
+    });
+
+    it('rejects invalid inputs on override credit limit', async () => {
+      const res = await overrideCreditLimit('user_1', 'invalid-uuid', -1000);
+      expect(res.success).toBe(false);
+      expect(res.error).toBeDefined();
+    });
+
+    it('rejects invalid inputs on product deactivation', async () => {
+      const res = await deactivateProduct('invalid-uuid');
       expect(res.success).toBe(false);
       expect(res.error).toBeDefined();
     });

@@ -4,6 +4,7 @@ import db, { runMigrations } from '@/lib/db';
 import { deriveKey, encryptField, decryptField } from '@/lib/crypto';
 import crypto from 'crypto';
 import { setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { headers } from 'next/headers';
 
 export interface UnlockResult {
   success: boolean;
@@ -96,7 +97,17 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
 }
 
 // Unlock the database using the DOP passphrase
-export async function unlockStore(dop: string, ipAddress: string = '127.0.0.1'): Promise<UnlockResult> {
+export async function unlockStore(dop: string, providedIp?: string): Promise<UnlockResult> {
+  let ipAddress = providedIp;
+  if (!ipAddress) {
+    try {
+      const h = await headers();
+      ipAddress = h.get('x-forwarded-for') || '127.0.0.1';
+    } catch {
+      ipAddress = '127.0.0.1';
+    }
+  }
+
   const isFirst = await checkFirstBoot();
   if (isFirst) {
     return { success: false, error: "Store is not yet initialized. Please complete setup.", isFirstBoot: true };
@@ -153,7 +164,17 @@ export async function unlockStore(dop: string, ipAddress: string = '127.0.0.1'):
 }
 
 // Disaster Recovery using the 12-word MMP recovery mnemonic
-export async function recoverStore(mnemonicWords: string[], newDop: string, ipAddress: string = '127.0.0.1'): Promise<UnlockResult> {
+export async function recoverStore(mnemonicWords: string[], newDop: string, providedIp?: string): Promise<UnlockResult> {
+  let ipAddress = providedIp;
+  if (!ipAddress) {
+    try {
+      const h = await headers();
+      ipAddress = h.get('x-forwarded-for') || '127.0.0.1';
+    } catch {
+      ipAddress = '127.0.0.1';
+    }
+  }
+
   if (mnemonicWords.length !== 12) {
     return { success: false, error: "Disaster recovery mnemonic must be exactly 12 words." };
   }

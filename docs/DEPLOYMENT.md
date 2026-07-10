@@ -47,10 +47,15 @@ Create a `.env.local` file in the project root:
 
 ```env
 SESSION_PASSWORD=your_secure_random_string_at_least_32_characters
+# Optional: Set to 'false' if running on a local LAN over unencrypted HTTP (no SSL) in production mode
+SESSION_SECURE=true
 ```
 
 > [!CAUTION]
 > **`SESSION_PASSWORD` is critical for production.** This value secures all `iron-session` cookies. If it is not set in production (`NODE_ENV=production`), the application will **refuse to start**. In development mode, a cryptographically random fallback is auto-generated per process — this is safe only for local development and must never be relied upon in production. An unset or weak session password means session cookies are trivially forgeable.
+>
+> **`SESSION_SECURE` settings:**
+> By default, the application marks cookies as `secure: true` in production, forcing the browser to only transmit them over HTTPS. If you are deploying to a local LAN without HTTPS, you **MUST** set `SESSION_SECURE=false` in `.env.local`, or the browser will discard session cookies and logins will fail.
 
 ### 2.3 HTTPS on LAN (Optional)
 

@@ -473,12 +473,43 @@ node scratch/verify-all-modules.js
 
 ---
 
-## Current Project Health (as of Phase 14)
+---
+
+### Phase 15: Production Concurrency & Integrity Remediation (Completed)
+
+#### Task 15.1: Dynamic IP Rate-Limiting Headers
+- Migrated client-supplied IP parameters to server-side dynamic extraction from `x-forwarded-for` headers using Next.js `headers()`.
+- Maintained backward-compatible parameter overrides for testing.
+- Status: ✅ Complete
+
+#### Task 15.2: Database Connection Caching (globalThis)
+- Cached the SQLite database connection instance on `globalThis` in development. Prevents fast refresh / hot reloads from leaking connection handles.
+- Status: ✅ Complete
+
+#### Task 15.3: Async Boot Synchronization
+- Refactored `initializeDatabase` to store a single boot promise. Ensures concurrent requests block until migrations finish during startup.
+- Status: ✅ Complete
+
+#### Task 15.4: Session Cookie HTTP LAN Fallback
+- Added environment override `SESSION_SECURE` to support secure cookie configuration inside unencrypted production LAN settings.
+- Status: ✅ Complete
+
+#### Task 15.5: Zod Schema Boundaries
+- Added Zod schemas to `createUser` and `deactivateProduct` parameters to enforce strict input boundaries.
+- Status: ✅ Complete
+
+#### Task 15.6: Null Category Safety Check
+- Added account existence checks in G/L journal line creation to prevent unhandled TypeErrors.
+- Status: ✅ Complete
+
+---
+
+## Current Project Health (as of Phase 15)
 - **Test Suites:** 11 (8 server action + 3 component)
-- **Tests:** 25, all passing
+- **Tests:** 29, all passing
 - **TypeScript:** `tsc --noEmit` clean
-- **Security:** Zero known vulnerabilities, zero hardcoded credentials, inactivity auto-lock, backup dry-runs, input validation boundaries
+- **Security:** Zero known vulnerabilities, zero hardcoded credentials, inactivity auto-lock, backup dry-runs, input validation boundaries, header-based IP tracking, LAN secure cookie toggle
 - **Migrations:** 5 SQL migrations
 - **Server Actions:** 10, all with structured error returns
 - **Components:** 20
-- **Shared Libraries:** 10 (added logger)
+- **Shared Libraries:** 10

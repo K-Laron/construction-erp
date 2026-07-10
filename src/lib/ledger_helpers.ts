@@ -50,7 +50,10 @@ export function createBalancedJournalEntry(
       // Debit increases balance for assets/expenses; Credit decreases it
       // Credit increases balance for liabilities/equity/revenue; Debit decreases it
       // We will look up category to update account balance accurately:
-      const account = db.prepare("SELECT category FROM accounts WHERE id = ?").get(line.accountId) as { category: string };
+      const account = db.prepare("SELECT category FROM accounts WHERE id = ?").get(line.accountId) as { category: string } | undefined;
+      if (!account) {
+        throw new Error(`ACCOUNT_NOT_FOUND: G/L Account '${line.accountId}' does not exist.`);
+      }
       let delta = 0;
       
       if (account.category === 'Asset' || account.category === 'Expense') {

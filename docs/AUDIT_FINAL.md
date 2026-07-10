@@ -127,11 +127,24 @@ This document records every finding identified during the multi-phase security a
 
 ---
 
+## Phase 10: Production Concurrency & Integrity Hardening
+
+| Area | Finding | Resolution | Status |
+|---|---|---|---|
+| Security / Rate-limiting | IP Rate limiting parameter is spoofable & defaults to 127.0.0.1 (DoS on LAN) | Removed client-supplied IP parameters and extracted client IPs server-side from `x-forwarded-for` headers | ✅ |
+| Session Security | Secure session cookies rejected in local LAN HTTP deployments | Allowed local HTTP overrides on production LAN hosts via the `SESSION_SECURE` config | ✅ |
+| Concurrency / Boot | Unawaited database boot sequence causes early execution race conditions | Awaited `initializeDatabase` promise resolution inside action access entry points | ✅ |
+| Concurrency / Leaks | Multi-connection SQLite handle leakage during Next.js hot reloads | Cached database connection instance on `globalThis` to preserve a single pool | ✅ |
+| Type Safety | Missing Zod boundaries on user and product deactivation actions | Added validation schema parsers to `createUser` and `deactivateProduct` | ✅ |
+| Type Safety | Unhandled null reference category check in G/L journal entries | Added existence check for accounts to prevent runtime category crashes | ✅ |
+
+---
+
 ## Final State Summary
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  11 test suites · 25 tests · ALL PASSING             │
+│  11 test suites · 29 tests · ALL PASSING             │
 │  TypeScript: CLEAN (tsc --noEmit)                    │
 │  ESLint: CLEAN                                       │
 │  Known security vulnerabilities: 0                   │
@@ -142,7 +155,7 @@ This document records every finding identified during the multi-phase security a
 ```
 
 > [!IMPORTANT]
-> All **2 critical**, **10 high**, **10 medium**, and **26+ low/refactor** findings have been resolved. No open items remain.
+> All **2 critical**, **13 high**, **13 medium**, and **26+ low/refactor** findings have been resolved. No open items remain.
 
 ---
 
@@ -156,7 +169,8 @@ This document records every finding identified during the multi-phase security a
 | 6 | 0 | 3 | 6 | 4 | 13 |
 | 7–8 | 0 | 0 | 0 | 4 | 4 |
 | 9 (Production) | 0 | 1 | 1 | 2 | 4 |
-| **Total** | **2** | **11** | **11** | **24** | **48** |
+| 10 (Concurrency) | 0 | 2 | 2 | 2 | 6 |
+| **Total** | **2** | **13** | **13** | **26** | **54** |
 
 ---
 
