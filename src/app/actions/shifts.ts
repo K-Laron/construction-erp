@@ -118,6 +118,9 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
     `).run(crypto.randomUUID(), shift.cashier_id, shiftId, `Expected: ${expectedCash}`, `Actual: ${actualCash}, Disc: ${discrepancy}`);
   })();
 
+  // Perform WAL truncate checkpoint to flush to disk and shrink .db-wal file
+  db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").run();
+
   return { success: true, data: { zReadingId, discrepancy } };
 } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : 'Failed to close shift' };

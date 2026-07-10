@@ -7,6 +7,7 @@ import { ShieldAlert, CreditCard, Banknote, UserCheck, CheckCircle2, Printer, Lo
 import Modal from '@/components/ui/Modal';
 import { getCustomers } from '@/app/actions/customers';
 import { processCheckout, CartItem } from '@/app/actions/transactions';
+import { getUsers } from '@/app/actions/auth';
 import { formatCurrency } from '@/lib/format';
 import { Customer } from '@/types';
 
@@ -33,12 +34,21 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [overridePin, setOverridePin] = useState<string>('');
+  const [managers, setManagers] = useState<{ username: string; name: string }[]>([]);
+  const [selectedManagerUsername, setSelectedManagerUsername] = useState<string>('');
   const [successData, setSuccessData] = useState<{ transactionId: string; siNumber: number | null; orNumber: number | null } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       getCustomers()
         .then(setCustomers)
+        .catch(err => logger.error(err.message, err));
+      getUsers()
+        .then(users => {
+          const mgrs = users.filter(u => u.is_active === 1 && (u.role === 'Admin' || u.role === 'Manager'));
+          setManagers(mgrs);
+          if (mgrs.length > 0) setSelectedManagerUsername(mgrs[0].username);
+        })
         .catch(err => logger.error(err.message, err));
       setSuccessData(null);
       setError('');
@@ -83,7 +93,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
         totalAmount,
         amountPaid: paymentMethod === 'Credit' ? parsedAmountPaid : Math.min(totalAmount, parsedAmountPaid || totalAmount),
         paymentMethod,
-        overridePin: overridePin || undefined
+        overridePin: overridePin || undefined,
+        overrideUsername: selectedManagerUsername || undefined
       };
 
       const result = await processCheckout(payload);
@@ -190,6 +201,19 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
                 <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 animate-pulse" />
                 <span>{totals.discount > 0 ? "Discount applied." : "Credit Limit exceeded."} This transaction requires manager approval.</span>
               </div>
+              {managers.length > 0 && (
+                <select
+                  value={selectedManagerUsername}
+                  onChange={e => setSelectedManagerUsername(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-950 border border-rose-900 rounded-lg text-white focus:outline-none focus:border-rose-500 font-semibold text-sm"
+                >
+                  {managers.map(m => (
+                    <option key={m.username} value={m.username} className="bg-surface-950 text-white">
+                      {m.name} ({m.username})
+                    </option>
+                  ))}
+                </select>
+              )}
               <input
                 type="password"
                 placeholder="Manager PIN"

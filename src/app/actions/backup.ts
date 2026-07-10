@@ -118,13 +118,56 @@ export async function exportEncryptedBackup(providedIp?: string): Promise<{ succ
 }
 
 export async function getBackupLogs(): Promise<{ id: string; timestamp: string; action_type: string }[]> {
-  const secret = getMlekSecret();
-  if (!secret) return [];
+  return db.prepare("SELECT id, timestamp, action_type FROM system_audit_logs WHERE action_type IN ('BACKUP_EXPORT', 'BACKUP_IMPORT') ORDER BY timestamp DESC").all() as { id: string; timestamp: string; action_type: string }[];
+}
 
-  return db.prepare(`
-    SELECT id, timestamp, action_type FROM system_audit_logs 
-    WHERE action_type = 'BACKUP_CRON' 
-    ORDER BY timestamp DESC
-    LIMIT 30
-  `).all() as { id: string; timestamp: string; action_type: string }[];
+export async function validateAndRestoreBackup(base64Payload: string, performedByUserId: string): Promise<{ success: boolean; error?: string }> {
+  const tempRestorePath = path.join(os.tmpdir(), `restore_temp_${crypto.randomUUID()}.db`);
+  try {
+    const secret = getMlekSecret(false);
+    if (!secret) throw new Error("Store is locked.");
+
+    const backupKey = crypto.pbkdf2Sync(secret, 'backup_derivation_salt', 100000, 32, 'sha256');
+
+    // Decrypt base64Payload into tempRestorePath
+    const buffer = Buffer.from(base64Payload, 'base64');
+    const iv = buffer.subarray(0, 12);
+    const tag = buffer.subarray(12, 28);
+    const ciphertext = buffer.subarray(28);
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', backupKey, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+
+    fs.writeFileSync(tempRestorePath, decrypted);
+
+    // Verify integrity of the decrypted DB
+    const tempDb = new Database(tempRestorePath);
+    const integrity = tempDb.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
+    tempDb.close();
+
+    if (integrity.integrity_check !== 'ok') {
+      throw new Error("RESTORE_FAILED: Backup integrity check failed.");
+    }
+
+    // Safely copy tempRestorePath to replace data/database.db
+    const mainDbPath = path.join(process.cwd(), 'data', 'database.db');
+    fs.copyFileSync(tempRestorePath, mainDbPath);
+
+    // Audit log
+    db.prepare(`
+      INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+      VALUES (?, CURRENT_TIMESTAMP, ?, 'BACKUP_IMPORT', ?, ?, ?)
+    `).run(crypto.randomUUID(), performedByUserId, 'RESTORE', 'OK', 'OK');
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  } finally {
+    try {
+      if (fs.existsSync(tempRestorePath)) {
+        fs.unlinkSync(tempRestorePath);
+      }
+    } catch {}
+  }
 }
