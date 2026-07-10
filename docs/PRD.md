@@ -343,6 +343,7 @@ CREATE TABLE IF NOT EXISTS supplier_ledger (
   amount INTEGER NOT NULL CHECK(amount > 0), -- Centavos
   reference_id TEXT,
   description TEXT,
+  hmac_signature TEXT,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
 );
 
@@ -458,14 +459,14 @@ CREATE TABLE IF NOT EXISTS delivery_items (
 CREATE TABLE IF NOT EXISTS shifts (
   id TEXT PRIMARY KEY,
   cashier_id TEXT NOT NULL,
-  start_time TEXT NOT NULL,
-  end_time TEXT,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT,
   opening_float INTEGER NOT NULL, -- Centavos
-  expected_cash INTEGER, -- Centavos
-  actual_cash INTEGER, -- Centavos
-  discrepancy INTEGER, -- Centavos
-  status TEXT CHECK(shift_status IN ('Open', 'Closed')) DEFAULT 'Open',
-  FOREIGN KEY (cashier_id) REFERENCES users(id)
+  closing_cash_actual INTEGER, -- Centavos
+  z_reading_id TEXT,
+  status TEXT CHECK(status IN ('Open', 'Closed')) DEFAULT 'Open',
+  FOREIGN KEY (cashier_id) REFERENCES users(id),
+  FOREIGN KEY (z_reading_id) REFERENCES shift_z_readings(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS shift_z_readings (

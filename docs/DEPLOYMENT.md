@@ -13,12 +13,18 @@ This document serves as the operational manual for deploying and maintaining the
    ```bash
    npm install
    ```
-2. (Optional) Generate locally trusted SSL certificates if you plan to wrap the Node process in an HTTPS proxy:
+2. Configure environment variables. Create a `.env.local` file in the project root:
+   ```env
+   SESSION_PASSWORD=your_secure_random_32_character_password_here
+   ```
+   *CRITICAL: Do not use the default fallback password in production, or Iron-Session cookies will be trivially forgeable.*
+
+3. (Optional) Generate locally trusted SSL certificates if you plan to wrap the Node process in an HTTPS proxy:
    ```bash
    ./scripts/setup-certs.sh
    ```
    *Note: Next.js standalone runs over HTTP by default. For production LAN deployment, run behind an NGINX reverse proxy with TLS.*
-3. Build the application:
+4. Build the application:
    ```bash
    npm run build
    ```

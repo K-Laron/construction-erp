@@ -357,3 +357,7 @@ node scratch/verify-all-modules.js
   - [x] Create `003_add_vat_payable.sql` and update seed.
   - [x] Revert VAT from `acc-vat-payable` proportionally during `processReturn` refunds.
   - [x] Correct Z-reading `vatable_sales` aggregate to strip inclusive tax for BIR compliance.
+  - [x] Extend HMAC integrity chaining to Supplier Ledger (`004_hmac_hardening.sql`).
+  - [x] Add ISO8601 timestamps to HMAC hash inputs to prevent replay attacks.
+  - [x] Add robust memory-mapped Vitest suite for pure backend server action isolation.
+  - [x] Finalize `Shift` typescript maps to strictly match the updated DB schema (`opened_at`, `closed_at`, `closing_cash_actual`, `z_reading_id`).
