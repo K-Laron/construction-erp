@@ -1,4 +1,6 @@
 "use client";
+import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 import { useState, useEffect } from 'react';
 import { Loader2, AlertTriangle, Truck } from 'lucide-react';
@@ -34,7 +36,7 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
           });
           setDispatchQtys(initialQtys);
         })
-        .catch(console.error)
+        .catch(err => logger.error(err.message, err))
         .finally(() => setLoading(false));
       setError('');
       setDriverName('');
@@ -69,9 +71,11 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
 
       await dispatchDelivery(transactionId, driverName, truckPlate, itemsPayload);
       onSuccess();
+      toast.success("Delivery dispatched successfully!");
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to dispatch delivery.');
+      toast.error(err.message || 'Failed to dispatch delivery.');
     }
     setLoading(false);
   };
@@ -80,41 +84,41 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
     <Modal isOpen={isOpen} onClose={onClose} title="Dispatch Delivery Trip" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs">
+          <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs" role="alert">
             {error}
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Driver Name</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Driver Name</label>
             <input
               type="text"
               required
               value={driverName}
               onChange={e => setDriverName(e.target.value)}
               placeholder="e.g. Cardo Dalisay"
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Truck Plate Number</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Truck Plate Number</label>
             <input
               type="text"
               required
               value={truckPlate}
               onChange={e => setTruckPlate(e.target.value)}
               placeholder="e.g. NQR-1234"
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Items to Deliver</label>
-          <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/20 max-h-60 overflow-y-auto">
+          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Items to Deliver</label>
+          <div className="border border-surface-800 rounded-xl overflow-hidden bg-surface-950/20 max-h-60 overflow-y-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+              <thead className="bg-surface-900 text-interactive-400 font-semibold border-b border-surface-800">
                 <tr>
                   <th className="py-2 px-3">Item Name</th>
                   <th className="py-2 px-3 text-center">Remaining</th>
@@ -123,9 +127,9 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
               </thead>
               <tbody>
                 {items.map(item => (
-                  <tr key={item.item_id} className="border-b border-slate-850">
+                  <tr key={item.item_id} className="border-b border-surface-700">
                     <td className="py-2 px-3 text-white font-bold">{item.item_name}</td>
-                    <td className="py-2 px-3 text-center text-slate-400 font-mono">
+                    <td className="py-2 px-3 text-center text-interactive-400 font-mono">
                       {formatQuantity(item.remaining_qty)} {item.unit}
                     </td>
                     <td className="py-2 px-3 text-right">
@@ -140,9 +144,9 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
                             updated[item.item_id] = e.target.value;
                             setDispatchQtys(updated);
                           }}
-                          className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded-md text-right text-white font-mono"
+                          className="w-20 px-2 py-1 bg-surface-950 border border-surface-700 rounded-md text-right text-white font-mono"
                         />
-                        <span className="text-slate-500 font-medium w-8 text-left">{item.unit}</span>
+                        <span className="text-interactive-400 font-medium w-8 text-left">{item.unit}</span>
                       </div>
                     </td>
                   </tr>
@@ -156,7 +160,7 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all"
+            className="flex-1 py-2.5 bg-surface-800 hover:bg-surface-700 text-interactive-500 font-medium rounded-xl text-sm transition-all"
           >
             Cancel
           </button>

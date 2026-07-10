@@ -74,25 +74,25 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
 
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Product Name</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Product Name</label>
             <input
               type="text"
               required
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g., Gravel 3/4, Portland Cement..."
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-sm focus:outline-none focus:border-indigo-500"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Category</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Category</label>
             <select
               value={category}
               onChange={e => setCategory(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-sm focus:outline-none focus:border-indigo-500"
             >
               <option value="Masonry">Masonry</option>
               <option value="Aggregates">Aggregates</option>
@@ -102,83 +102,83 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Selling Unit</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Selling Unit</label>
             <input
               type="text"
               required
               value={unit}
               onChange={e => setUnit(e.target.value)}
               placeholder="e.g., pc, bag, cu.m"
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-sm focus:outline-none focus:border-indigo-500"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Initial Stock</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Initial Stock</label>
             <input
               type="number"
               step="0.001"
               required
               value={stockQtyStr}
               onChange={e => setStockQtyStr(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Reorder Level Alert</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Reorder Level Alert</label>
             <input
               type="number"
               step="0.001"
               required
               value={reorderLevelStr}
               onChange={e => setReorderLevelStr(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-[10px] font-semibold text-slate-400 mb-1.5 uppercase">Cost Price</label>
+            <label className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Cost Price</label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">₱</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 text-xs">₱</span>
               <input
                 type="number"
                 step="0.01"
                 required
                 value={costPriceStr}
                 onChange={e => setCostPriceStr(e.target.value)}
-                className="w-full pl-5 pr-2 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                className="w-full pl-5 pr-2 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-xs focus:outline-none focus:border-indigo-500 font-mono"
               />
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-slate-400 mb-1.5 uppercase">Retail Price</label>
+            <label className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Retail Price</label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">₱</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 text-xs">₱</span>
               <input
                 type="number"
                 step="0.01"
                 required
                 value={sellingPriceStr}
                 onChange={e => setSellingPriceStr(e.target.value)}
-                className="w-full pl-5 pr-2 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                className="w-full pl-5 pr-2 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-xs focus:outline-none focus:border-indigo-500 font-mono"
               />
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-slate-400 mb-1.5 uppercase">Wholesale Price</label>
+            <label className="block text-[10px] font-semibold text-interactive-400 mb-1.5 uppercase">Wholesale Price</label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">₱</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 text-xs">₱</span>
               <input
                 type="number"
                 step="0.01"
                 required
                 value={wholesalePriceStr}
                 onChange={e => setWholesalePriceStr(e.target.value)}
-                className="w-full pl-5 pr-2 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                className="w-full pl-5 pr-2 py-2 bg-surface-950 border border-surface-700 rounded-xl text-interactive-500 text-xs focus:outline-none focus:border-indigo-500 font-mono"
               />
             </div>
           </div>
@@ -188,14 +188,14 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess }: Product
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all"
+            className="flex-1 py-2.5 bg-surface-800 hover:bg-surface-700 text-interactive-400 font-medium rounded-xl text-sm transition-all"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-interactive-500 font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Add Product

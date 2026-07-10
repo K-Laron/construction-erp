@@ -1,4 +1,5 @@
 "use client";
+import { logger } from "@/lib/logger";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -25,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    logger.error("Uncaught error: " + error, errorInfo);
   }
 
   public reset = () => {
@@ -45,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           
           <h2 className="text-xl font-bold text-white mb-2">Component Error</h2>
-          <p className="text-slate-400 mb-6 text-sm max-w-md">
+          <p className="text-interactive-400 mb-6 text-sm max-w-md">
             Something went wrong while loading this view.
             {this.state.error?.message && (
               <span className="block mt-2 font-mono text-xs text-rose-400/80 bg-rose-950/30 p-2 rounded break-words">

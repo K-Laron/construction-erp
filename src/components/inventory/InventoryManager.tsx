@@ -1,6 +1,8 @@
 "use client";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
+import { logger } from "@/lib/logger";
 import { Search, PlusCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
 import { formatCurrency, formatQuantity } from '@/lib/format';
@@ -20,7 +22,7 @@ export default function InventoryManager() {
       const data = await getInventory();
       setInventory(data);
     } catch (err) {
-      console.error(err);
+      logger.error(String(err), err);
     }
     setLoading(false);
   };
@@ -39,10 +41,10 @@ export default function InventoryManager() {
 
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto no-print">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-surface-800 pb-5">
         <div>
           <h1 className="text-xl font-bold text-white">Stock Inventory</h1>
-          <p className="text-slate-400 text-xs mt-1">Monitor quantities, unit conversions, and pricing</p>
+          <p className="text-interactive-400 text-xs mt-1">Monitor quantities, unit conversions, and pricing</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -55,13 +57,13 @@ export default function InventoryManager() {
 
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-interactive-400" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search stock catalog..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-surface-900 border border-surface-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs transition-all"
           />
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
@@ -72,7 +74,7 @@ export default function InventoryManager() {
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border ${
                 selectedCategory === cat
                   ? 'bg-emerald-600/10 border-emerald-500/40 text-emerald-400'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  : 'bg-surface-900 border-surface-800 text-interactive-400 hover:text-interactive-500'
               }`}
             >
               {cat}
@@ -82,18 +84,16 @@ export default function InventoryManager() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-        </div>
+        <SkeletonTable rows={5} cols={4} />
       ) : filteredItems.length === 0 ? (
-        <div className="border border-slate-800 rounded-xl p-12 text-center text-slate-500 text-sm">
+        <div className="border border-surface-800 rounded-xl p-12 text-center text-interactive-400 text-sm">
           No inventory products found matching filters.
         </div>
       ) : (
-        <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40">
+        <div className="border border-surface-800 rounded-xl overflow-hidden bg-surface-950/40">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+              <tr className="bg-surface-900 text-interactive-400 font-semibold border-b border-surface-800 uppercase tracking-wider">
                 <th className="py-3 px-4">Product Name</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Selling Unit</th>
@@ -110,7 +110,7 @@ export default function InventoryManager() {
                 return (
                   <tr
                     key={item.id}
-                    className={`border-b border-slate-850 hover:bg-slate-900/30 transition-colors ${
+                    className={`border-b border-surface-700 hover:bg-surface-900/30 transition-colors ${
                       lowStock ? 'bg-rose-950/5' : ''
                     }`}
                   >
@@ -118,15 +118,15 @@ export default function InventoryManager() {
                       {lowStock && <AlertTriangle className="w-3.5 h-3.5 text-rose-500 animate-pulse" />}
                       {item.name}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-400">{item.category}</td>
-                    <td className="py-3.5 px-4 text-slate-400">{item.unit}</td>
-                    <td className={`py-3.5 px-4 text-right font-mono font-semibold ${lowStock ? 'text-rose-400 font-bold' : 'text-slate-200'}`}>
+                    <td className="py-3.5 px-4 text-interactive-400">{item.category}</td>
+                    <td className="py-3.5 px-4 text-interactive-400">{item.unit}</td>
+                    <td className={`py-3.5 px-4 text-right font-mono font-semibold ${lowStock ? 'text-rose-400 font-bold' : 'text-interactive-500'}`}>
                       {formatQuantity(item.stock_quantity)}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-mono text-slate-400">{formatCurrency(item.cost_price)}</td>
+                    <td className="py-3.5 px-4 text-right font-mono text-interactive-400">{formatCurrency(item.cost_price)}</td>
                     <td className="py-3.5 px-4 text-right font-mono text-emerald-400 font-bold">{formatCurrency(item.selling_price)}</td>
                     <td className="py-3.5 px-4 text-right font-mono text-indigo-400 font-semibold">{formatCurrency(item.wholesale_price)}</td>
-                    <td className="py-3.5 px-4 text-right font-mono text-slate-400">{formatQuantity(item.reorder_level)}</td>
+                    <td className="py-3.5 px-4 text-right font-mono text-interactive-400">{formatQuantity(item.reorder_level)}</td>
                   </tr>
                 );
               })}

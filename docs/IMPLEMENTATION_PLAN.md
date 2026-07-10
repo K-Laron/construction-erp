@@ -168,10 +168,10 @@ Build a desktop-first, local-first management suite to operate a complete small-
   2. Server logs active database connections on boot.
 
 #### Task 3.4: Tailwind CSS v4 Theme Cleanup
-- **Description**: Configure theme color tokens inside `src/app/globals.css` using neutral Apple-style surfaces (off-white base, crisp white panels), and interactive blue controls.
+- **Description**: Configure theme color tokens in `src/app/globals.css` using `:root, .light` and `.dark` blocks. Dark mode: slate-950 backgrounds, emerald-500 accent. Light mode: slate-50 backgrounds, emerald-600 accent.
 - **Approval Metrics**:
   1. Typography displays consistent dark colors for high-contrast readability.
-  2. Theme styles apply uniformly across panels using a clean, minimal "Bento-box" structure.
+  2. Theme styles apply uniformly across panels using a clean, data-dense dashboard structure with glass-panel cards.
 
 ---
 

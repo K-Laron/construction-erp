@@ -1,48 +1,101 @@
 @import "tailwindcss";
 
-/* ── Root variables ────────────────────────────────────────────────── */
-:root {
-  --background: #f5f5f7;
-  --foreground: #1d1d1f;
+/* ═══════════════════════════════════════════════════════════════════════
+   Theme variables — light (default) + dark
+   ═══════════════════════════════════════════════════════════════════════ */
+:root, .light {
+  --_surface-950: #f8fafc;
+  --_surface-900: #f1f5f9;
+  --_surface-800: #e2e8f0;
+  --_surface-700: #cbd5e1;
+  --_surface-600: #94a3b8;
+
+  --_accent-500: #059669;
+  --_accent-400: #10b981;
+  --_accent-600: #047857;
+  --_accent-700: #065f46;
+
+  --_interactive-500: #1e293b;
+  --_interactive-400: #64748b;
+  --_interactive-600: #0f172a;
+  --_interactive-700: #020617;
+
+  --_warning-500: #d97706;
+  --_warning-400: #f59e0b;
+  --_warning-600: #b45309;
+
+  --_error-500: #dc2626;
+  --_error-400: #ef4444;
+  --_error-600: #b91c1c;
+
+  --_bg: #f8fafc;
+  --_bg-card: #ffffff;
+  --_border: #e2e8f0;
+  --_text: #1e293b;
+  --_text-muted: #64748b;
+}
+
+.dark {
+  --_surface-950: #020617;
+  --_surface-900: #0b1120;
+  --_surface-800: #111827;
+  --_surface-700: #1e293b;
+  --_surface-600: #334155;
+
+  --_accent-500: #10b981;
+  --_accent-400: #34d399;
+  --_accent-600: #059669;
+  --_accent-700: #047857;
+
+  --_interactive-500: #f8fafc;
+  --_interactive-400: #94a3b8;
+  --_interactive-600: #e2e8f0;
+  --_interactive-700: #cbd5e1;
+
+  --_warning-500: #f59e0b;
+  --_warning-400: #fbbf24;
+  --_warning-600: #d97706;
+
+  --_error-500: #ef4444;
+  --_error-400: #f87171;
+  --_error-600: #dc2626;
+
+  --_bg: #020617;
+  --_bg-card: #111827;
+  --_border: #1e293b;
+  --_text: #f8fafc;
+  --_text-muted: #94a3b8;
 }
 
 /* ── Tailwind v4 @theme inline ─────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface-950: var(--_surface-950);
+  --color-surface-900: var(--_surface-900);
+  --color-surface-800: var(--_surface-800);
+  --color-surface-700: var(--_surface-700);
+  --color-surface-600: var(--_surface-600);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --color-accent-500: var(--_accent-500);
+  --color-accent-400: var(--_accent-400);
+  --color-accent-600: var(--_accent-600);
+  --color-accent-700: var(--_accent-700);
 
-  /* Surfaces */
-  --color-surface-950: #ffffff;
-  --color-surface-900: #f5f5f7;
-  --color-surface-800: #e5e5ea;
-  --color-surface-700: #d1d1d6;
-  --color-surface-600: #c7c7cc;
+  --color-interactive-500: var(--_interactive-500);
+  --color-interactive-400: var(--_interactive-400);
+  --color-interactive-600: var(--_interactive-600);
+  --color-interactive-700: var(--_interactive-700);
 
-  /* Accents – Blue (Apple default) */
-  --color-accent-500: #0071e3;
-  --color-accent-400: #0077ed;
-  --color-accent-600: #005cbf;
-  --color-accent-700: #004085;
+  --color-warning-500: var(--_warning-500);
+  --color-warning-400: var(--_warning-400);
+  --color-warning-600: var(--_warning-600);
 
-  /* Interactive – Dark Grey */
-  --color-interactive-500: #1d1d1f;
-  --color-interactive-400: #424245;
-  --color-interactive-600: #000000;
-  --color-interactive-700: #000000;
+  --color-error-500: var(--_error-500);
+  --color-error-400: var(--_error-400);
+  --color-error-600: var(--_error-600);
 
-  /* Warning – Orange */
-  --color-warning-500: #ff9500;
-  --color-warning-400: #ff9f0a;
-  --color-warning-600: #e58600;
+  --font-sans: 'Fira Sans', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'Fira Code', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
 
-  /* Error – Red */
-  --color-error-500: #ff3b30;
-  --color-error-400: #ff453a;
-  --color-error-600: #d70015;
-
-  /* Animation timings */
   --animate-fade-in: fade-in 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) both;
   --animate-slide-up: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
@@ -72,8 +125,8 @@
 
 /* ── Base ───────────────────────────────────────────────────────────── */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--_bg);
+  color: var(--_text);
   font-family: var(--font-sans);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -82,17 +135,17 @@ body {
 
 /* ── UI Pro Max Apple Style (Bento Box) ────────────────────────────── */
 .glass-panel {
-  background: #ffffff;
+  background: var(--_bg-card);
   border-radius: 20px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--_border);
 }
 
 .glass-panel-dense {
-  background: #ffffff;
+  background: var(--_bg-card);
   border-radius: 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--_border);
 }
 
 /* ── UI Pro Max UX Micro-Animations ────────────────────────────────── */
@@ -111,44 +164,27 @@ body {
   animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ── Theme transition ──────────────────────────────────────────────── */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 /* ── Custom scrollbar (webkit) ─────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.5);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.8);
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.5); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.6); }
 
 /* Firefox scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(71, 85, 105, 0.5) transparent;
-}
+* { scrollbar-width: thin; scrollbar-color: rgba(71, 85, 105, 0.5) transparent; }
 
 /* ── Selection ──────────────────────────────────────────────────────── */
-::selection {
-  background: rgba(99, 102, 241, 0.4);
-  color: #fff;
-}
+::selection { background: rgba(16, 185, 129, 0.35); color: #fff; }
 
 /* ── Focus ring utility ─────────────────────────────────────────────── */
-.focus-ring {
-  outline: none;
-  transition: box-shadow 0.2s ease;
-}
+.focus-ring { outline: none; transition: box-shadow 0.2s ease; }
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px rgba(99, 102, 241, 0.8);
+  box-shadow: 0 0 0 2px var(--_bg), 0 0 0 4px var(--_accent-500);
   border-radius: 4px;
 }
 
@@ -161,23 +197,10 @@ body {
 
 /* ── Print styles ──────────────────────────────────────────────────── */
 @media print {
-  @page {
-    size: A5 landscape;
-    margin: 8mm;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-  body {
-    background: #fff !important;
-    color: #000 !important;
-    font-size: 10pt;
-  }
-
-  .glass-panel,
-  .glass-panel-dense {
+  @page { size: A5 landscape; margin: 8mm; }
+  .no-print { display: none !important; }
+  body { background: #fff !important; color: #000 !important; font-size: 10pt; }
+  .glass-panel, .glass-panel-dense {
     background: #fff !important;
     backdrop-filter: none !important;
     border: 1px solid #ccc !important;

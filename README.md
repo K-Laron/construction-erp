@@ -2,7 +2,7 @@
 
 **Next.js 16 (App Router) · SQLite (WAL) · Tailwind CSS v4 · TypeScript · Vitest · PWA**
 
-A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning system purpose-built for construction supply retailers. Designed for harsh daylight environments with a minimal Apple-style "Bento-box" UI, enterprise-grade security, and full BIR compliance.
+A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning system purpose-built for construction supply retailers. Designed for harsh daylight environments with a high-contrast data-dense dashboard, light/dark mode, enterprise-grade security, and full BIR compliance.
 
 ---
 
@@ -12,8 +12,9 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | ----------- | ----------------------------------- |
 | Framework   | Next.js 16 (App Router)             |
 | Database    | SQLite via better-sqlite3, WAL mode |
-| Styling     | Tailwind CSS v4                     |
+| Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
+| Fonts       | Fira Sans (body), Fira Code (heading/mono)
 | Testing     | Vitest (10 suites, 20 tests)        |
 | Logging     | Structured logger (level-filtered)  |
 | Health      | `/api/health` endpoint              |
@@ -32,7 +33,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 ### Architecture
 
 - **Local-first & offline-capable** — SQLite database, no internet required, installable as a PWA
-- **High-contrast daylight readability** — Minimal Bento-box UI optimized for outdoor/warehouse environments
+- **High-contrast daylight readability** — Data-dense dashboard with light/dark mode, optimized for outdoor/warehouse environments
 - **A5 landscape print engine** — Receipt generation for thermal and standard printers
 - **Structured error handling** — All server actions return `{ success, data, error }`; `ErrorBoundary` component for UI crash isolation
 - **Health monitoring** — `/api/health` endpoint with DB, MLEK, migration, and shift checks

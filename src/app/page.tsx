@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { logger } from "@/lib/logger";
 import { getStoreStatus, lockStoreAction } from '@/app/actions/store';
 import UnlockScreen from '@/components/UnlockScreen';
 import LoginScreen from '@/components/LoginScreen';
@@ -19,11 +20,10 @@ export default function Home() {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [isUnlocked, setIsUnlocked] = useState<boolean | null>(null);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
-  
+
   const [activeView, setActiveView] = useState('pos');
   const [activeShiftId, setActiveShiftId] = useState<string | null>(null);
 
-  // Active print overlay state
   const [printData, setPrintData] = useState<{ transaction: any; items: any[]; customerName?: string } | null>(null);
 
   const checkStatus = async () => {
@@ -32,7 +32,7 @@ export default function Home() {
       setIsConfigured(status.isConfigured);
       setIsUnlocked(status.isUnlocked);
     } catch (err) {
-      console.error(err);
+      logger.error(String(err), err);
     }
   };
 
@@ -52,13 +52,12 @@ export default function Home() {
 
   if (isConfigured === null || isUnlocked === null) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-sm">
+      <div className="min-h-screen bg-surface-950 flex items-center justify-center text-interactive-400 text-sm">
         Connecting to local ERP node...
       </div>
     );
   }
 
-  // 1. Operational lock check
   if (!isUnlocked) {
     return (
       <UnlockScreen
@@ -71,7 +70,6 @@ export default function Home() {
     );
   }
 
-  // 2. Staff auth check
   if (!currentUser) {
     return (
       <LoginScreen
@@ -115,13 +113,12 @@ export default function Home() {
       case 'maintenance':
         return <MaintenancePanel currentUser={currentUser} />;
       default:
-        return <div className="p-6 text-slate-400">View not found</div>;
+        return <div className="p-6 text-interactive-400">View not found</div>;
     }
   };
 
   return (
     <>
-      {/* Print View Layout Overlay */}
       {printData && (
         <div className="hidden print:block">
           <A5PrintReceipt
@@ -132,8 +129,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Screen Layout Dashboard */}
-      <div className="flex-1 flex min-h-screen flex-col bg-slate-950 text-slate-100 print:hidden">
+      <div className="flex-1 flex min-h-screen flex-col bg-surface-950 text-interactive-500 print:hidden">
         <DashboardLayout
           activeView={activeView}
           onNavigate={(view) => {

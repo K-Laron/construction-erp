@@ -30,7 +30,6 @@ export default function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -49,7 +48,6 @@ export default function Modal({
     };
   }, [isOpen, handleKeyDown]);
 
-  // Close on backdrop click
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) onClose();
   };
@@ -84,9 +82,8 @@ export default function Modal({
           )
         )}
       >
-        {/* ── Header ────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
-          <h2 className="text-lg font-semibold text-slate-100 tracking-tight">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-700">
+          <h2 className="text-lg font-semibold text-interactive-500 tracking-tight">
             {title}
           </h2>
           <button
@@ -94,8 +91,8 @@ export default function Modal({
             className={twMerge(
               clsx(
                 "flex items-center justify-center w-8 h-8 rounded-lg",
-                "text-slate-400 hover:text-slate-100",
-                "hover:bg-slate-700/60",
+                "text-interactive-400 hover:text-interactive-500",
+                "hover:bg-surface-800",
                 "transition-colors duration-150",
                 "focus-ring cursor-pointer"
               )
@@ -106,7 +103,6 @@ export default function Modal({
           </button>
         </div>
 
-        {/* ── Body ──────────────────────────────────── */}
         <div className="px-6 py-5 max-h-[calc(100vh-12rem)] overflow-y-auto">
           {children}
         </div>

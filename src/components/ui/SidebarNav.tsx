@@ -80,7 +80,7 @@ export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) 
                   "focus-ring",
                   isActive
                     ? "bg-surface-800 text-interactive-600"
-                    : "text-slate-500 hover:text-interactive-600 hover:bg-surface-800"
+                    : "text-interactive-400 hover:text-interactive-600 hover:bg-surface-800"
                 )
               )}
             >
@@ -92,7 +92,7 @@ export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) 
               <Icon
                 className={clsx(
                   "w-5 h-5 shrink-0 transition-colors duration-200",
-                  isActive ? "text-accent-500" : "text-slate-400 group-hover:text-interactive-600"
+                  isActive ? "text-accent-500" : "text-interactive-400 group-hover:text-interactive-600"
                 )}
               />
 
@@ -123,7 +123,7 @@ export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) 
             clsx(
               "flex items-center gap-3 w-full rounded-lg",
               "h-11 px-3 text-sm font-semibold",
-              "text-slate-500 hover:text-error-500 hover:bg-error-500/10",
+              "text-interactive-400 hover:text-error-500 hover:bg-error-500/10",
               "transition-all duration-200 ease-out cursor-pointer",
               "focus-ring"
             )

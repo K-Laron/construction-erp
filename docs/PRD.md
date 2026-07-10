@@ -8,7 +8,7 @@ Build a desktop-first, local-first management suite to operate a complete small-
 The system runs completely **offline** on a local computer, using a local SQLite database file, requiring no internet connectivity.
 
 ### Design Aesthetic
-The application employs a minimal, clean, Apple-inspired 'Bento-box' visual language with high-contrast neutral backgrounds, solid crisp white panels, and signature interactive blue accents. This maximizes daylight readability for cashiers and warehouse staff, prioritizing function and clarity over distracting visual elements.
+The application employs a data-dense dashboard aesthetic with a dark slate/emerald palette, light/dark mode, and Fira Sans/Code typography. This maximizes daylight readability for cashiers and warehouse staff while maintaining professional clarity.
 
 ---
 

@@ -13,6 +13,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import SidebarNav from "./SidebarNav";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -43,12 +44,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-transparent">
-      {/* ── Sidebar ──────────────────────────────────── */}
       <SidebarNav activeView={activeView} onNavigate={onNavigate} />
 
-      {/* ── Main area ────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* ── Top bar ──────────────────────────────────── */}
         <header
           className={twMerge(
             clsx(
@@ -58,7 +56,6 @@ export default function DashboardLayout({
             )
           )}
         >
-          {/* Left: View title */}
           <div className="flex items-center gap-3">
             <div className="p-2 bg-surface-800 rounded-lg">
               <ViewIcon className="w-5 h-5 text-interactive-500" />
@@ -68,9 +65,7 @@ export default function DashboardLayout({
             </h1>
           </div>
 
-          {/* Right: status + user */}
           <div className="flex items-center gap-5">
-            {/* Shift status */}
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface-950 border border-surface-800">
               <CircleDot
                 className={clsx(
@@ -88,10 +83,12 @@ export default function DashboardLayout({
               </span>
             </div>
 
-            {/* Divider */}
             <div className="w-px h-6 bg-surface-700" />
 
-            {/* User badge */}
+            <ThemeToggle />
+
+            <div className="w-px h-6 bg-surface-700" />
+
             <div className="flex items-center gap-3 hover:bg-surface-800 p-1.5 pr-4 rounded-full transition-smooth cursor-pointer">
               <div className="flex items-center justify-center w-9 h-9 rounded-full bg-interactive-600">
                 <UserCircle className="w-5 h-5 text-white" />
@@ -100,7 +97,7 @@ export default function DashboardLayout({
                 <span className="text-sm font-bold text-interactive-600 leading-tight">
                   {currentUser?.name ?? "Operator"}
                 </span>
-                <span className="text-[11px] text-slate-500 font-medium leading-tight">
+                <span className="text-[11px] text-interactive-400 font-medium leading-tight">
                   {currentUser?.role ?? "Cashier"}
                 </span>
               </div>
@@ -108,7 +105,6 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* ── Content ────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-6">
           {children}
         </main>

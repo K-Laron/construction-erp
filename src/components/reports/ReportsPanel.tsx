@@ -1,6 +1,8 @@
 "use client";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
+import { logger } from "@/lib/logger";
 import { BarChart3, TrendingUp, DollarSign, Users, Package, Loader2 } from 'lucide-react';
 import { getTrialBalance, runHeavyAuditReport } from '@/app/actions/ledger';
 import { getInventory } from '@/app/actions/inventory';
@@ -81,7 +83,7 @@ export default function ReportsPanel() {
         setMargins(calculatedMargins);
 
       } catch (err) {
-        console.error(err);
+        logger.error(String(err), err);
       }
       setLoading(false);
     }
@@ -98,9 +100,9 @@ export default function ReportsPanel() {
 
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto no-print">
-      <div className="border-b border-slate-800 pb-5">
+      <div className="border-b border-surface-800 pb-5">
         <h1 className="text-xl font-bold text-white">General Ledger Reports</h1>
-        <p className="text-slate-400 text-xs mt-1">Financial summaries, profitability margins, and A/R aging ledgers</p>
+        <p className="text-interactive-400 text-xs mt-1">Financial summaries, profitability margins, and A/R aging ledgers</p>
       </div>
 
       {/* KPI Cards Grid */}
@@ -109,14 +111,14 @@ export default function ReportsPanel() {
           { label: "Today's Gross Sales", value: totals.todaySales, icon: TrendingUp, color: 'text-emerald-400' },
           { label: "Today's Cash Collections", value: totals.cashCollections, icon: DollarSign, color: 'text-indigo-400' },
           { label: "Total Outstanding A/R", value: totals.outstandingAR, icon: Users, color: 'text-amber-400' },
-          { label: "Inventory Asset Value", value: totals.inventoryValue, icon: Package, color: 'text-slate-300' }
+          { label: "Inventory Asset Value", value: totals.inventoryValue, icon: Package, color: 'text-interactive-500' }
         ].map((card, i) => {
           const Icon = card.icon;
           return (
-            <div key={i} className="p-5 border border-slate-800 rounded-xl bg-slate-950/40 space-y-3">
+            <div key={i} className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-xs font-semibold uppercase">{card.label}</span>
-                <div className={`p-2 rounded-lg bg-slate-900 border border-slate-800 ${card.color}`}>
+                <span className="text-interactive-400 text-xs font-semibold uppercase">{card.label}</span>
+                <div className={`p-2 rounded-lg bg-surface-900 border border-surface-800 ${card.color}`}>
                   <Icon className="w-4 h-4" />
                 </div>
               </div>
@@ -129,17 +131,17 @@ export default function ReportsPanel() {
       {/* A/R Aging List and Profit Margins Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Outstanding Receivables Aging */}
-        <div className="p-5 border border-slate-800 rounded-xl bg-slate-950/40 space-y-4">
+        <div className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-4">
           <h3 className="font-bold text-white text-sm flex items-center gap-2">
             <Users className="w-4 h-4 text-amber-400" />
             Accounts Receivable Aging
           </h3>
           {agingList.length === 0 ? (
-            <p className="text-slate-500 text-xs py-6 text-center">No outstanding customer receivables.</p>
+            <p className="text-interactive-400 text-xs py-6 text-center">No outstanding customer receivables.</p>
           ) : (
-            <div className="border border-slate-800 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+            <div className="border border-surface-800 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                <thead className="bg-surface-900 text-interactive-400 font-semibold border-b border-surface-800">
                   <tr>
                     <th className="py-2.5 px-3">Customer Account</th>
                     <th className="py-2.5 px-3">Price Tier</th>
@@ -148,7 +150,7 @@ export default function ReportsPanel() {
                 </thead>
                 <tbody>
                   {agingList.map(c => (
-                    <tr key={c.id} className="border-b border-slate-850 hover:bg-slate-900/30">
+                    <tr key={c.id} className="border-b border-surface-700 hover:bg-surface-900/30">
                       <td className="py-2.5 px-3 text-white font-bold">{c.name}</td>
                       <td className="py-2.5 px-3 text-slate-450">{c.price_tier}</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-400">
@@ -163,14 +165,14 @@ export default function ReportsPanel() {
         </div>
 
         {/* Product Profit Margins Analysis */}
-        <div className="p-5 border border-slate-800 rounded-xl bg-slate-950/40 space-y-4">
+        <div className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-4">
           <h3 className="font-bold text-white text-sm flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-emerald-400" />
             Gross Profit Margins
           </h3>
-          <div className="border border-slate-800 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+          <div className="border border-surface-800 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+              <thead className="bg-surface-900 text-interactive-400 font-semibold border-b border-surface-800">
                 <tr>
                   <th className="py-2.5 px-3">Product Name</th>
                   <th className="py-2.5 px-3 text-right">Cost</th>
@@ -180,12 +182,12 @@ export default function ReportsPanel() {
               </thead>
               <tbody>
                 {margins.map((item, i) => (
-                  <tr key={i} className="border-b border-slate-850 hover:bg-slate-900/30">
+                  <tr key={i} className="border-b border-surface-700 hover:bg-surface-900/30">
                     <td className="py-2.5 px-3 text-white font-bold">{item.name}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-400">{formatCurrency(item.costPrice)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-200">{formatCurrency(item.sellingPrice)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-interactive-400">{formatCurrency(item.costPrice)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-interactive-500">{formatCurrency(item.sellingPrice)}</td>
                     <td className={`py-2.5 px-3 text-right font-mono font-bold ${
-                      item.marginPct >= 20 ? 'text-emerald-400' : 'text-slate-300'
+                      item.marginPct >= 20 ? 'text-emerald-400' : 'text-interactive-500'
                     }`}>
                       {item.marginPct.toFixed(1)}%
                     </td>

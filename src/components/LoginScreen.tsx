@@ -39,7 +39,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <User className="w-10 h-10 text-interactive-500" />
           </div>
           <h1 className="text-2xl font-bold text-interactive-600 tracking-tight">Staff Login</h1>
-          <p className="text-slate-500 text-sm mt-2 font-medium">Enter your credentials to continue</p>
+          <p className="text-interactive-400 text-sm mt-2 font-medium">Enter your credentials to continue</p>
         </div>
 
         {error && (
@@ -53,7 +53,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <div>
             <label className="block text-sm font-semibold text-interactive-500 mb-2 tracking-wide">Username</label>
             <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-accent-500 transition-colors" />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-accent-500 transition-colors" />
               <input
                 type="text"
                 value={username}
@@ -69,7 +69,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <div>
             <label className="block text-sm font-semibold text-interactive-500 mb-2 tracking-wide">PIN</label>
             <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-accent-500 transition-colors" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-accent-500 transition-colors" />
               <input
                 id="pin-input"
                 type="password"

@@ -1,4 +1,5 @@
 'use client';
+import { logger } from "@/lib/logger";
 import { useEffect } from 'react';
 
 export function PWA() {
@@ -6,7 +7,7 @@ export function PWA() {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch((err) => {
-          console.error('ServiceWorker registration failed: ', err);
+          logger.error('ServiceWorker registration failed: ', err);
         });
       });
     }

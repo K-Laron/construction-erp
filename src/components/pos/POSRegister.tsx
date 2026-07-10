@@ -1,6 +1,8 @@
 "use client";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
+import { logger } from "@/lib/logger";
 import { Search, ShoppingCart, Trash2, Plus, Minus, Tag, Truck, Receipt, Loader2, AlertTriangle } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
 import { formatCurrency, formatQuantity } from '@/lib/format';
@@ -34,7 +36,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
       const data = await getInventory();
       setInventory(data);
     } catch (err) {
-      console.error(err);
+      logger.error(String(err), err);
     }
     setLoading(false);
   };
@@ -106,7 +108,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
     switch (cat.toLowerCase()) {
       case 'masonry': return 'bg-amber-500/10 border-amber-500/30 text-amber-300';
       case 'aggregates': return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
-      case 'cement': return 'bg-slate-500/10 border-slate-500/30 text-slate-300';
+      case 'cement': return 'bg-slate-500/10 border-slate-500/30 text-interactive-500';
       case 'steel': return 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300';
       default: return 'bg-zinc-500/10 border-zinc-500/30 text-zinc-300';
     }
@@ -119,7 +121,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
         {/* Filter bar */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-accent-500 transition-colors" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-accent-500 transition-colors" />
             <input
               type="text"
               value={search}
@@ -131,7 +133,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
           <button
             onClick={loadInventory}
             disabled={loading}
-            className="px-4 py-3 bg-white border border-surface-800 rounded-xl text-slate-500 hover:text-interactive-600 transition-smooth flex items-center gap-2 shadow-sm whitespace-nowrap"
+            className="px-4 py-3 bg-white border border-surface-800 rounded-xl text-interactive-400 hover:text-interactive-600 transition-smooth flex items-center gap-2 shadow-sm whitespace-nowrap"
           >
             <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="text-sm font-semibold">Refresh</span>
@@ -144,7 +146,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
                 className={`px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wide whitespace-nowrap transition-smooth btn-hover-fx border ${
                   selectedCategory === cat
                     ? 'bg-interactive-600 text-white shadow-md border-transparent'
-                    : 'bg-white text-slate-500 hover:text-interactive-600 border-surface-800'
+                    : 'bg-white text-interactive-400 hover:text-interactive-600 border-surface-800'
                 }`}
               >
                 {cat}
@@ -159,13 +161,13 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
             <Loader2 className="w-8 h-8 text-accent-500 animate-spin" />
           </div>
         ) : inventory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+          <div className="flex flex-col items-center justify-center h-64 text-interactive-400">
             <p>No products available.</p>
             <p className="text-sm">Please add items to the inventory.</p>
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
-            <AlertTriangle className="w-10 h-10 text-slate-400" />
+          <div className="flex-1 flex flex-col items-center justify-center text-interactive-400 gap-2">
+            <AlertTriangle className="w-10 h-10 text-interactive-400" />
             <span>No products matching your filters.</span>
           </div>
         ) : (
@@ -194,20 +196,20 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
                         {item.category}
                       </span>
                       <h3 className="font-bold text-interactive-600 group-hover:text-accent-500 transition-colors">{item.name}</h3>
-                      <span className="text-slate-500 text-xs mt-0.5 block">Selling Unit: {item.unit}</span>
+                      <span className="text-interactive-400 text-xs mt-0.5 block">Selling Unit: {item.unit}</span>
                     </div>
                   </div>
                   
                   <div className="flex justify-between items-end mt-5 pt-4 border-t border-surface-800">
                     <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">Stock Level</span>
-                      <span className={`font-mono text-sm font-semibold flex items-center gap-1.5 ${lowStock ? 'text-error-600' : 'text-slate-500'}`}>
+                      <span className="text-[10px] text-interactive-400 uppercase font-bold tracking-wider block mb-1">Stock Level</span>
+                      <span className={`font-mono text-sm font-semibold flex items-center gap-1.5 ${lowStock ? 'text-error-600' : 'text-interactive-400'}`}>
                         {formatQuantity(item.stock_quantity)} {item.unit}
                         {lowStock && <span className="px-1.5 py-0.5 rounded-md bg-error-500/10 text-[10px] text-error-600 font-bold border border-error-500/20">LOW</span>}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">Retail Price</span>
+                      <span className="text-[10px] text-interactive-400 uppercase font-bold tracking-wider block mb-1">Retail Price</span>
                       <span className="text-lg font-bold text-interactive-600 font-mono">{formatCurrency(item.selling_price)}</span>
                     </div>
                   </div>
@@ -235,8 +237,8 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
         {/* Cart List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-surface-900/30">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
-              <ShoppingCart className="w-10 h-10 text-slate-300" />
+            <div className="h-full flex flex-col items-center justify-center text-interactive-400 gap-2">
+              <ShoppingCart className="w-10 h-10 text-interactive-500" />
               <span className="text-xs">Your shopping cart is empty.</span>
             </div>
           ) : (
@@ -244,7 +246,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
               <div key={item.itemId} className="p-3.5 bg-white border border-surface-800 rounded-xl flex items-center justify-between gap-4 animate-[slideUp_0.2s_ease-out] shadow-sm">
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-interactive-600 text-sm truncate">{item.name}</h4>
-                  <span className="text-slate-500 text-xs font-mono">
+                  <span className="text-interactive-400 text-xs font-mono">
                     {formatCurrency(item.unitPrice)} / {item.unitUsed}
                   </span>
                 </div>
@@ -275,7 +277,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
                   </span>
                   <button
                     onClick={() => removeFromCart(item.itemId)}
-                    className="p-2 rounded-xl bg-surface-900 hover:bg-error-500/10 text-slate-400 hover:text-error-500 border border-surface-800 hover:border-error-500/20 transition-smooth group"
+                    className="p-2 rounded-xl bg-surface-900 hover:bg-error-500/10 text-interactive-400 hover:text-error-500 border border-surface-800 hover:border-error-500/20 transition-smooth group"
                   >
                     <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   </button>
@@ -290,12 +292,12 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
           <div className="space-y-3 text-xs">
             {/* Delivery fee Input */}
             <div className="flex justify-between items-center">
-              <span className="text-slate-500 flex items-center gap-1.5">
-                <Truck className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-interactive-400 flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5 text-interactive-400" />
                 Delivery Fee
               </span>
               <div className="relative w-28">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₱</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 font-medium">₱</span>
                 <input
                   type="number"
                   placeholder="0.00"
@@ -308,12 +310,12 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
 
             {/* Discount Input */}
             <div className="flex justify-between items-center">
-              <span className="text-slate-500 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-interactive-400 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-interactive-400" />
                 Discount
               </span>
               <div className="relative w-28">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₱</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-interactive-400 font-medium">₱</span>
                 <input
                   type="number"
                   placeholder="0.00"
@@ -326,8 +328,8 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
 
             {/* Tax Toggle */}
             <div className="flex justify-between items-center">
-              <span className="text-slate-500 flex items-center gap-1.5">
-                <Receipt className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-interactive-400 flex items-center gap-1.5">
+                <Receipt className="w-3.5 h-3.5 text-interactive-400" />
                 VAT Tax (12%)
               </span>
               <button
@@ -335,7 +337,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
                 className={`px-3 py-1.5 rounded-lg border font-semibold transition-all ${
                   taxEnabled
                     ? 'bg-accent-500/10 border-accent-500/20 text-accent-600'
-                    : 'bg-surface-900 border-surface-800 text-slate-500'
+                    : 'bg-surface-900 border-surface-800 text-interactive-400'
                 }`}
               >
                 {taxEnabled ? 'Enabled' : 'Disabled'}
@@ -352,12 +354,12 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
 
           {/* Totals Summary */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-slate-500">
+            <div className="flex justify-between text-xs text-interactive-400">
               <span>Subtotal</span>
               <span className="font-mono text-interactive-600">{formatCurrency(subtotal)}</span>
             </div>
             {taxEnabled && (
-              <div className="flex justify-between text-xs text-slate-500">
+              <div className="flex justify-between text-xs text-interactive-400">
                 <span>VAT Collected (12%)</span>
                 <span className="font-mono text-interactive-600">{formatCurrency(tax)}</span>
               </div>
@@ -369,7 +371,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
               </div>
             )}
             {deliveryFee > 0 && (
-              <div className="flex justify-between text-xs text-slate-500">
+              <div className="flex justify-between text-xs text-interactive-400">
                 <span>Delivery Charge</span>
                 <span className="font-mono text-interactive-600">+{formatCurrency(deliveryFee)}</span>
               </div>
@@ -386,7 +388,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
           <button
             onClick={() => setCheckoutOpen(true)}
             disabled={cart.length === 0}
-            className="w-full py-4 bg-interactive-600 hover:bg-interactive-500 disabled:bg-surface-800 disabled:text-slate-400 text-white font-bold rounded-xl text-base btn-hover-fx flex items-center justify-center gap-2"
+            className="w-full py-4 bg-interactive-600 hover:bg-interactive-500 disabled:bg-surface-800 disabled:text-interactive-400 text-white font-bold rounded-xl text-base btn-hover-fx flex items-center justify-center gap-2"
           >
             <ShoppingCart className="w-5 h-5" />
             Go to Checkout

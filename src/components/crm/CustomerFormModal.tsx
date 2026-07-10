@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
       const limitCentavos = parsePesoCentavos(creditLimitStr);
       await createCustomer(name, phone || null, address || null, limitCentavos, priceTier, isVatExempt ? 1 : 0);
       onSuccess();
+      toast.success("Customer created successfully!");
       onClose();
       // Reset form
       setName('');
@@ -42,6 +44,7 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
       setIsVatExempt(false);
     } catch (err: any) {
       setError(err.message || 'Failed to create customer.');
+      toast.error(err.message || 'Failed to create customer.');
     }
     setLoading(false);
   };
@@ -50,74 +53,74 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Customer" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs">
+          <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs" role="alert">
             {error}
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Customer Name</label>
+          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Customer Name</label>
           <input
             type="text"
             required
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="John Doe Construction..."
-            className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Phone Number</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Phone Number</label>
             <input
               type="text"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="0917-XXX-XXXX"
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Credit Limit</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Credit Limit</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">₱</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-interactive-400 text-sm">₱</span>
               <input
                 type="number"
                 step="0.01"
                 value={creditLimitStr}
                 onChange={e => setCreditLimitStr(e.target.value)}
-                className="w-full pl-6 pr-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
+                className="w-full pl-6 pr-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
               />
             </div>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Jobsite/Billing Address</label>
+          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Jobsite/Billing Address</label>
           <textarea
             value={address}
             onChange={e => setAddress(e.target.value)}
             placeholder="Enter full physical address..."
             rows={2}
-            className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
+            className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Price Tier</label>
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Price Tier</label>
             <select
               value={priceTier}
               onChange={e => setPriceTier(e.target.value as 'Retail' | 'Wholesale')}
-              className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
             >
               <option value="Retail">Retail</option>
               <option value="Wholesale">Wholesale</option>
             </select>
           </div>
           <div className="flex items-center pt-5">
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300 font-medium">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-interactive-500 font-medium">
               <input
                 type="checkbox"
                 checked={isVatExempt}
@@ -133,7 +136,7 @@ export default function CustomerFormModal({ isOpen, onClose, onSuccess }: Custom
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all"
+            className="flex-1 py-2.5 bg-surface-800 hover:bg-surface-700 text-interactive-500 font-medium rounded-xl text-sm transition-all"
           >
             Cancel
           </button>

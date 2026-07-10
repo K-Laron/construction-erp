@@ -93,7 +93,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
             </div>
             <div>
               <h1 className="text-2xl font-bold text-interactive-600">Store Initialized!</h1>
-              <p className="text-slate-500 text-sm">Save your recovery mnemonic now.</p>
+              <p className="text-interactive-400 text-sm">Save your recovery mnemonic now.</p>
             </div>
           </div>
 
@@ -108,14 +108,14 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
             <div className="grid grid-cols-3 gap-2">
               {generatedMnemonic.map((word, i) => (
                 <div key={i} className="bg-surface-950 border border-surface-800 rounded-lg px-3 py-2 text-center">
-                  <span className="text-slate-400 text-xs mr-1">{i + 1}.</span>
+                  <span className="text-interactive-400 text-xs mr-1">{i + 1}.</span>
                   <span className="text-interactive-600 font-mono font-semibold">{word}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <p className="text-slate-500 text-xs mb-4">
+          <p className="text-interactive-400 text-xs mb-4">
             Default admin account: <span className="text-interactive-600 font-mono">admin</span> / PIN: <span className="text-interactive-600 font-mono font-bold text-lg">{generatedAdminPin}</span>
           </p>
 
@@ -139,7 +139,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
             <Lock className="w-10 h-10 text-interactive-500" />
           </div>
           <h1 className="text-2xl font-bold text-interactive-600 tracking-tight">Construction Supply ERP</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-interactive-400 text-sm mt-1">
             {mode === 'setup' ? 'First-Time Store Setup' : mode === 'recover' ? 'Disaster Recovery' : 'Daily Operational Unlock'}
           </p>
         </div>
@@ -149,13 +149,13 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
           <div className="flex gap-1 mb-6 p-1 glass-panel-dense bg-surface-950 rounded-xl border border-surface-800">
             <button
               onClick={() => { setMode('unlock'); setError(''); }}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-smooth ${mode === 'unlock' ? 'bg-interactive-600 text-white shadow-md' : 'text-slate-500 hover:text-interactive-600 hover:bg-surface-800'}`}
+              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-smooth ${mode === 'unlock' ? 'bg-interactive-600 text-white shadow-md' : 'text-interactive-400 hover:text-interactive-600 hover:bg-surface-800'}`}
             >
               Unlock
             </button>
             <button
               onClick={() => { setMode('recover'); setError(''); }}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-smooth ${mode === 'recover' ? 'bg-warning-500 text-white shadow-md' : 'text-slate-500 hover:text-interactive-600 hover:bg-surface-800'}`}
+              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-smooth ${mode === 'recover' ? 'bg-warning-500 text-white shadow-md' : 'text-interactive-400 hover:text-interactive-600 hover:bg-surface-800'}`}
             >
               Recovery
             </button>
@@ -176,7 +176,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
             <div>
               <label className="block text-sm font-semibold text-interactive-500 mb-2">Daily Operational Passphrase</label>
               <div className="relative group">
-                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-interactive-600 transition-colors" />
+                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-interactive-400 group-focus-within:text-interactive-600 transition-colors" />
                 <input
                   type="password"
                   value={dop}
@@ -218,7 +218,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
                   <div key={i} className={`h-1.5 flex-1 rounded-full transition-smooth ${rx.test(dop) ? 'bg-accent-500' : 'bg-surface-800'}`} />
                 ))}
               </div>
-              <p className="text-slate-500 text-xs mt-2 font-medium">{dop.length}/14 characters minimum</p>
+              <p className="text-interactive-400 text-xs mt-2 font-medium">{dop.length}/14 characters minimum</p>
             </div>
             <button
               onClick={handleSetup}

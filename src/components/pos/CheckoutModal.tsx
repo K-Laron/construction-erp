@@ -1,4 +1,6 @@
 "use client";
+import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 import { useState, useEffect } from 'react';
 import { ShieldAlert, CreditCard, Banknote, UserCheck, CheckCircle2, Printer, Loader2 } from 'lucide-react';
@@ -37,7 +39,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
     if (isOpen) {
       getCustomers()
         .then(setCustomers)
-        .catch(console.error);
+        .catch(err => logger.error(err.message, err));
       setSuccessData(null);
       setError('');
       setAmountPaidStr('');
@@ -88,10 +90,12 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
       if (!result.success) {
         throw new Error(result.error);
       }
+      toast.success("Transaction completed successfully!");
       setSuccessData(result.data!);
       onSuccess({ transactionId: result.data!.transactionId, siNumber: result.data!.siNumber, orNumber: result.data!.orNumber, payload });
     } catch (err: any) {
       setError(err.message || 'Checkout failed.');
+      toast.error(err.message || 'Checkout failed.');
     }
     setLoading(false);
   };
@@ -101,7 +105,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
       {!successData ? (
         <div className="space-y-5">
           {error && (
-            <div className="p-3 bg-rose-950/40 border border-rose-800/60 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-950/40 border border-rose-800/60 rounded-xl text-rose-300 text-xs flex items-center gap-2" role="alert">
               <ShieldAlert className="w-4 h-4 shrink-0" />
               {error}
             </div>
@@ -109,13 +113,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
 
           {/* Customer Mapping */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
               Customer Account
             </label>
             <select
               value={selectedCustomerId}
               onChange={e => setSelectedCustomerId(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 text-sm"
+              className="w-full px-3.5 py-2.5 bg-surface-950 border border-surface-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 text-sm"
             >
               <option value="">Anonymous Walk-in Customer</option>
               {customers.map(c => (
@@ -128,13 +132,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
 
           {/* Customer Credit Info */}
           {selectedCustomer && (
-            <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl grid grid-cols-2 gap-4 text-xs">
+            <div className="p-3 bg-surface-900/60 border border-surface-800 rounded-xl grid grid-cols-2 gap-4 text-xs">
               <div>
-                <span className="text-slate-400 block mb-0.5">Current Balance:</span>
+                <span className="text-interactive-400 block mb-0.5">Current Balance:</span>
                 <span className="font-semibold text-white">{formatCurrency(selectedCustomer.current_balance)}</span>
               </div>
               <div>
-                <span className="text-slate-400 block mb-0.5">Credit Limit:</span>
+                <span className="text-interactive-400 block mb-0.5">Credit Limit:</span>
                 <span className="font-semibold text-white">{formatCurrency(selectedCustomer.credit_limit)}</span>
               </div>
             </div>
@@ -142,7 +146,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
 
           {/* Payment Method Selector */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
               Payment Method
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -168,7 +172,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
                     className={`p-3 border rounded-xl flex flex-col items-center gap-1.5 transition-all text-xs font-semibold ${
                       active
                         ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                        : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-slate-200'
+                        : 'border-surface-800 bg-surface-900/40 text-interactive-400 hover:text-interactive-500'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -191,7 +195,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
                 placeholder="Manager PIN"
                 value={overridePin}
                 onChange={e => setOverridePin(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-rose-900 rounded-lg text-white focus:outline-none focus:border-rose-500 font-semibold text-sm"
+                className="w-full px-3 py-2 bg-surface-950 border border-rose-900 rounded-lg text-white focus:outline-none focus:border-rose-500 font-semibold text-sm"
               />
             </div>
           )}
@@ -200,35 +204,35 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
           {paymentMethod !== 'Credit' ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
                   Amount Received
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-sm">₱</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-interactive-400 font-semibold text-sm">₱</span>
                   <input
                     type="number"
                     step="0.01"
                     value={amountPaidStr}
                     onChange={e => setAmountPaidStr(e.target.value)}
                     placeholder="Enter cash received..."
-                    className="w-full pl-8 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-semibold"
+                    className="w-full pl-8 pr-4 py-2.5 bg-surface-950 border border-surface-700 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-semibold"
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-slate-900/40 border border-slate-800/80 rounded-xl">
+              <div className="grid grid-cols-2 gap-3 text-sm p-3 bg-surface-900/40 border border-surface-800/80 rounded-xl">
                 <div>
-                  <span className="text-slate-400 block text-xs">Change Due:</span>
+                  <span className="text-interactive-400 block text-xs">Change Due:</span>
                   <span className="text-lg font-bold text-white">{formatCurrency(changeDue)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-xs">Balance Owed:</span>
+                  <span className="text-interactive-400 block text-xs">Balance Owed:</span>
                   <span className="text-lg font-bold text-white">{formatCurrency(balanceDue)}</span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-xl flex justify-between items-center text-sm">
-              <span className="text-slate-400 font-medium">To be Charged to Credit Ledger:</span>
+            <div className="p-4 bg-surface-900/30 border border-surface-800 rounded-xl flex justify-between items-center text-sm">
+              <span className="text-interactive-400 font-medium">To be Charged to Credit Ledger:</span>
               <span className="text-lg font-extrabold text-indigo-400">{formatCurrency(totalAmount)}</span>
             </div>
           )}
@@ -238,7 +242,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             <button
               onClick={onClose}
               type="button"
-              className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all"
+              className="flex-1 py-3 bg-surface-800 hover:bg-surface-700 text-interactive-500 font-medium rounded-xl text-sm transition-all"
             >
               Cancel
             </button>
@@ -246,7 +250,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
               onClick={handleSubmit}
               disabled={loading || (needsOverride && !overridePin) || (paymentMethod !== 'Credit' && !amountPaidStr)}
               type="button"
-              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-surface-700 disabled:text-interactive-400 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               Process Transaction
@@ -260,19 +264,19 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
           </div>
           <div>
             <h3 className="text-xl font-bold text-white">Payment Successful!</h3>
-            <p className="text-slate-400 text-sm mt-1">Transaction recorded in general ledger.</p>
+            <p className="text-interactive-400 text-sm mt-1">Transaction recorded in general ledger.</p>
           </div>
 
-          <div className="p-4 bg-slate-900/50 border border-slate-800 rounded-2xl max-w-xs mx-auto text-sm space-y-2">
+          <div className="p-4 bg-surface-900/50 border border-surface-800 rounded-2xl max-w-xs mx-auto text-sm space-y-2">
             {successData.siNumber && (
               <div className="flex justify-between">
-                <span className="text-slate-400">Sales Invoice:</span>
+                <span className="text-interactive-400">Sales Invoice:</span>
                 <span className="font-mono font-bold text-white">#{successData.siNumber}</span>
               </div>
             )}
             {successData.orNumber && (
               <div className="flex justify-between">
-                <span className="text-slate-400">Official Receipt:</span>
+                <span className="text-interactive-400">Official Receipt:</span>
                 <span className="font-mono font-bold text-white">#{successData.orNumber}</span>
               </div>
             )}
@@ -290,7 +294,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-all"
+              className="flex-1 py-3 bg-surface-800 hover:bg-surface-700 text-interactive-500 font-semibold rounded-xl text-sm transition-all"
             >
               Close
             </button>

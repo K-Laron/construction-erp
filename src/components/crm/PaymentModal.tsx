@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -38,9 +39,11 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
       const amountCentavos = parsePesoCentavos(amountStr);
       await recordPayment(customer.id, amountCentavos, description);
       onSuccess();
+      toast.success("Payment recorded successfully!");
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to record payment.');
+      toast.error(err.message || 'Failed to record payment.');
     }
     setLoading(false);
   };
@@ -51,26 +54,26 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
     <Modal isOpen={isOpen} onClose={onClose} title="Receive Cash Payment" size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs">
+          <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs" role="alert">
             {error}
           </div>
         )}
 
-        <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl text-xs space-y-1">
+        <div className="p-3 bg-surface-900/40 border border-surface-800 rounded-xl text-xs space-y-1">
           <div className="flex justify-between">
-            <span className="text-slate-400">Customer:</span>
+            <span className="text-interactive-400">Customer:</span>
             <span className="font-bold text-white">{customer.name}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-400">Outstanding Balance:</span>
+            <span className="text-interactive-400">Outstanding Balance:</span>
             <span className="font-bold text-white">{formatCurrency(customer.current_balance)}</span>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Payment Amount</label>
+          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Payment Amount</label>
           <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₱</span>
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-interactive-400 font-bold">₱</span>
             <input
               type="number"
               step="0.01"
@@ -78,19 +81,19 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
               value={amountStr}
               onChange={e => setAmountStr(e.target.value)}
               placeholder="0.00"
-              className="w-full pl-8 pr-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
+              className="w-full pl-8 pr-3.5 py-2.5 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 font-mono font-bold"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Reference / Description</label>
+          <label className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Reference / Description</label>
           <input
             type="text"
             required
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
+            className="w-full px-3.5 py-2 bg-surface-950 border border-surface-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -98,7 +101,7 @@ export default function PaymentModal({ isOpen, onClose, customer, onSuccess }: P
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all"
+            className="flex-1 py-2.5 bg-surface-800 hover:bg-surface-700 text-interactive-500 font-medium rounded-xl text-sm transition-all"
           >
             Cancel
           </button>
