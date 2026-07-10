@@ -30,7 +30,7 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
           // Pre-populate with maximum remaining quantities
           const initialQtys: Record<string, string> = {};
           data.forEach(item => {
-            initialQtys[item.item_id] = formatQuantity(item.remaining_qty);
+            initialQtys[item.item_id] = (item.remaining_qty / 1000).toString();
           });
           setDispatchQtys(initialQtys);
         })

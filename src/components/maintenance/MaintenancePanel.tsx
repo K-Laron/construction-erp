@@ -464,7 +464,7 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
                                 type="number"
                                 step="0.001"
                                 min="0"
-                                max={formatQuantity(item.quantity)}
+                                max={item.quantity / 1000}
                                 value={returnQtys[item.item_id] || '0'}
                                 onChange={e => {
                                   const updated = { ...returnQtys };

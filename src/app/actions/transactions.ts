@@ -330,7 +330,7 @@ export async function processReturn(
               const ledgerId = crypto.randomUUID();
               const entryData = { id: ledgerId, customer_id: tx.customer_id, date: new Date().toISOString(), type: 'CREDIT' as const, amount: actualCreditRefund, reference_id: transactionId, description: `Return on Txn ${transactionId.slice(0, 8)}` };
               const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
-              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id) VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, entryData.date, actualCreditRefund, transactionId, entryData.description, signature, cashierId);
+              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id) VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, entryData.date, actualCreditRefund, transactionId, entryData.description, signature, processedBy);
             }
           } else {
             glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: refundAmount });

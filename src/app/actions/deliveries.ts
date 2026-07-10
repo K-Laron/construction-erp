@@ -29,24 +29,23 @@ export async function getDeliveryRemainingItems(transactionId: string): Promise<
   checkMlek();
 
   return db.prepare(`
-    SELECT 
-      ti.item_id, i.name as item_name, i.unit,
-      ti.quantity as ordered_qty,
-      COALESCE(
-        (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
-         JOIN deliveries d ON di.delivery_id = d.id 
-         WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
-      ) as delivered_qty,
-      ti.quantity - COALESCE(
-        (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
-         JOIN deliveries d ON di.delivery_id = d.id 
-         WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
-      ) as remaining_qty
-    FROM transaction_items ti
-    JOIN inventory i ON ti.item_id = i.id
-    WHERE ti.transaction_id = ?
-    HAVING remaining_qty > 0
-  `).all(transactionId, transactionId, transactionId);
+    WITH cte AS (
+      SELECT 
+        ti.item_id, i.name as item_name, i.unit,
+        ti.quantity as ordered_qty,
+        COALESCE(
+          (SELECT SUM(di.quantity_delivered) FROM delivery_items di 
+           JOIN deliveries d ON di.delivery_id = d.id 
+           WHERE d.transaction_id = ? AND di.item_id = ti.item_id), 0
+        ) as delivered_qty
+      FROM transaction_items ti
+      JOIN inventory i ON ti.item_id = i.id
+      WHERE ti.transaction_id = ?
+    )
+    SELECT *, ordered_qty - delivered_qty as remaining_qty
+    FROM cte
+    WHERE (ordered_qty - delivered_qty) > 0
+  `).all(transactionId, transactionId);
 }
 
 // Dispatch a delivery trip
