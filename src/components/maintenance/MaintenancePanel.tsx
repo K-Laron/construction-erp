@@ -7,6 +7,7 @@ import { exportEncryptedBackup, getBackupLogs } from '@/app/actions/backup';
 import { runDailyGLScan } from '@/app/actions/ledger';
 import { getCustomers, getCustomerLedger } from '@/app/actions/customers';
 import { formatCurrency, formatQuantity } from '@/lib/format';
+import { toast } from 'sonner';
 
 interface MaintenancePanelProps {
   currentUser: any;
@@ -68,7 +69,7 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       setPin('');
       const uData = await getUsers();
       setUsers(uData);
-      alert('Staff user created successfully!');
+      toast.success('Staff user created successfully!');
     } catch (err: any) {
       setFormError(err.message || 'Failed to create user.');
     }
@@ -92,10 +93,10 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
         a.click();
         window.URL.revokeObjectURL(url);
       } else {
-        alert('Backup failed: ' + result.error);
+        toast.error('Backup failed: ' + result.error);
       }
     } catch (err: any) {
-      alert('Backup failed: ' + err.message);
+      toast.error('Backup failed: ' + err.message);
     }
   };
 
@@ -153,10 +154,10 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
         });
         setReturnQtys(initialQtys);
       } else {
-        alert('Transaction not found.');
+        toast.error('Transaction not found.');
       }
     } catch (err: any) {
-      alert('Error finding transaction: ' + err.message);
+      toast.error('Error finding transaction: ' + err.message);
     }
     setSearchingTxn(false);
   };
@@ -180,11 +181,11 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       }
 
       await processReturn(activeTxnDetails.transaction.id, itemsToReturn, currentUser.id);
-      alert('Return processed and inventory restocked successfully!');
+      toast.success('Return processed and inventory restocked successfully!');
       setActiveTxnDetails(null);
       setTxnSearchId('');
     } catch (err: any) {
-      alert('Failed to process return: ' + err.message);
+      toast.error('Failed to process return: ' + err.message);
     }
     setReturnLoading(false);
   };

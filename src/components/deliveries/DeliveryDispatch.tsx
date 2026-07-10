@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Truck, CheckCircle2, ChevronDown, ChevronUp, Loader2, Calendar } from 'lucide-react';
 import { getPendingDeliveries, getDeliveryHistory, confirmDelivery } from '@/app/actions/deliveries';
-import { formatCurrency, formatDate } from '@/lib/format';
+import { formatCurrency, formatDate, formatQuantity } from '@/lib/format';
 import DispatchModal from './DispatchModal';
 
 export default function DeliveryDispatch() {
@@ -170,7 +170,7 @@ export default function DeliveryDispatch() {
                                         {trip.items.map((it: any) => (
                                           <div key={it.id} className="flex justify-between text-[11px]">
                                             <span className="text-slate-400">{it.item_name}</span>
-                                            <span className="font-mono text-white">{(it.quantity_delivered / 1000).toFixed(0)} {it.unit}</span>
+                                            <span className="font-mono text-white">{formatQuantity(it.quantity_delivered)} {it.unit}</span>
                                           </div>
                                         ))}
                                       </div>

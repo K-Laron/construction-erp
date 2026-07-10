@@ -366,3 +366,7 @@ node scratch/verify-all-modules.js
   - [x] Replace `alert()` with `sonner` toast notifications for shift close feedback.
   - [x] Add explicit comment explaining combo-payment point-of-sale split logic for `acc-ar`.
   - [x] Fix TypeScript type mismatch in `isRestock` testing argument.
+  - [x] Fix fractional display rounding in Delivery Dispatch using `formatQuantity()`.
+  - [x] Fix test logic in `shifts.test.ts` to properly mock full `amount_paid` cashier match.
+  - [x] Add UI warning regarding zero-rated reporting vs inclusive prices when VAT is disabled.
+  - [x] Replace `alert()` popups in Maintenance Panel with `sonner` toast notifications.

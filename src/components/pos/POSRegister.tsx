@@ -335,7 +335,13 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
               >
                 {taxEnabled ? 'Enabled' : 'Disabled'}
               </button>
+              </button>
             </div>
+            {!taxEnabled && (
+              <div className="text-[10px] text-amber-500/80 leading-tight">
+                Note: Prices remain VAT-inclusive. Disabling VAT reports the sale as zero-rated to the BIR but does not automatically discount the customer total.
+              </div>
+            )}
           </div>
 
           <div className="h-px bg-surface-800 my-3" />
