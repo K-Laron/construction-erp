@@ -140,6 +140,17 @@ This document records every finding identified during the multi-phase security a
 
 ---
 
+## Phase 11: Production Cryptographic & Auto-Lock Hardening
+
+| Area | Finding | Resolution | Status |
+|---|---|---|---|
+| Security / DoS | Sequential PBKDF2 hashing of all managers in override checks causes DoS | Supported targeted check via `overrideUsername` and capped sequential fallback loop to max 3 managers | ✅ |
+| Security | Insecure PRNG `Math.random` used to generate admin PIN on bootstrap | Replaced with cryptographically secure `crypto.randomInt` generator | ✅ |
+| Security / Auto-lock | Read-only shifts queries passively reset the inactivity timeout | Modified actions `getCurrentShift`, `getZReading`, and `getShiftHistory` to call `checkMlek(false)` | ✅ |
+| UX | No client redirect to login screen on inactivity lock | Added 30s status polling in client `Home` wrapper to flush user state and show Unlock screen | ✅ |
+
+---
+
 ## Final State Summary
 
 ```
@@ -155,7 +166,7 @@ This document records every finding identified during the multi-phase security a
 ```
 
 > [!IMPORTANT]
-> All **2 critical**, **13 high**, **13 medium**, and **26+ low/refactor** findings have been resolved. No open items remain.
+> All **2 critical**, **15 high**, **14 medium**, and **27+ low/refactor** findings have been resolved. No open items remain.
 
 ---
 
@@ -170,7 +181,8 @@ This document records every finding identified during the multi-phase security a
 | 7–8 | 0 | 0 | 0 | 4 | 4 |
 | 9 (Production) | 0 | 1 | 1 | 2 | 4 |
 | 10 (Concurrency) | 0 | 2 | 2 | 2 | 6 |
-| **Total** | **2** | **13** | **13** | **26** | **54** |
+| 11 (Auto-lock/Crypt) | 0 | 2 | 1 | 1 | 4 |
+| **Total** | **2** | **15** | **14** | **27** | **58** |
 
 ---
 

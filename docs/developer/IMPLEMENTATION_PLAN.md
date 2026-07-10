@@ -504,12 +504,32 @@ node scratch/verify-all-modules.js
 
 ---
 
-## Current Project Health (as of Phase 15)
+### Phase 16: Security Hardening & Timeout UX Remediations (Completed)
+
+#### Task 16.1: Manager Override DoS Mitigation
+- Updated `verifyOverride` in `transactions.ts` to support targeted lookups using `overrideUsername`, and capped the sequential PBKDF2 fallback loop to a maximum of 3 manager records. This prevents event loop blocking CPU exhaustion.
+- Status: ✅ Complete
+
+#### Task 16.2: Cryptographically Secure Bootstrap PIN
+- Replaced the non-cryptographic `Math.random()` array PIN builder in `unlock.ts` with a secure random number generation using `crypto.randomInt(100000, 999999)`.
+- Status: ✅ Complete
+
+#### Task 16.3: Shift Passive check updates
+- Updated read-only shift endpoints (`getCurrentShift`, `getZReading`, `getShiftHistory`) to invoke `checkMlek(false)`. Prevents POS cashier activity polling from resetting the inactivity timer.
+- Status: ✅ Complete
+
+#### Task 16.4: Auto-Lock UX Redirect
+- Configured a 30-second interval status checker inside the client-side main `Home` view wrapper (`page.tsx`) to detect when the store has been locked. Clears local cashier state and redirects operators immediately back to the DOP Unlock screen.
+- Status: ✅ Complete
+
+---
+
+## Current Project Health (as of Phase 16)
 - **Test Suites:** 11 (8 server action + 3 component)
 - **Tests:** 29, all passing
 - **TypeScript:** `tsc --noEmit` clean
-- **Security:** Zero known vulnerabilities, zero hardcoded credentials, inactivity auto-lock, backup dry-runs, input validation boundaries, header-based IP tracking, LAN secure cookie toggle
-- **Migrations:** 5 SQL migrations
+- **Security:** Zero known vulnerabilities, zero hardcoded credentials, inactivity auto-lock, backup dry-runs, input validation boundaries, header-based IP tracking, LAN secure cookie toggle, DoS-safe PBKDF2 manager override checks, secure PRNG bootstrap PINs.
+- **Migrations:** 5 SQL migrations, 1 programmatic JS migration
 - **Server Actions:** 10, all with structured error returns
 - **Components:** 20
 - **Shared Libraries:** 10
