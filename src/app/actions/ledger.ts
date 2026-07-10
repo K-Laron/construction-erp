@@ -101,9 +101,21 @@ export async function runDailyGLScan(): Promise<{ isCorrupt: boolean; corruptEnt
   return { isCorrupt: false, corruptEntries: [] };
 }
 
+// Predefined safe audit queries
+const REPORT_QUERIES: Record<string, string> = {
+  'TODAY_SALES': "SELECT COALESCE(SUM(total_amount), 0) as total FROM transactions WHERE date(date) = date('now')",
+  'TODAY_COLLECTIONS': "SELECT COALESCE(SUM(amount), 0) as total FROM customer_ledger WHERE type = 'CREDIT' AND date(date) = date('now')"
+};
+
 // Offload heavy queries to read-only worker threads to prevent main loop blocks
-export async function runHeavyAuditReport(query: string, params: any[] = []): Promise<any[]> {
+export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COLLECTIONS', params: any[] = []): Promise<any[]> {
   checkMlek();
+  
+  const query = REPORT_QUERIES[reportType];
+  if (!query) {
+    throw new Error(`Invalid report type: ${reportType}`);
+  }
+
   return new Promise((resolve, reject) => {
     const worker = new Worker(path.resolve(process.cwd(), 'src/lib/workers/reportQuery.js'), {
       workerData: { query, params }

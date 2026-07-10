@@ -45,15 +45,11 @@ export default function ReportsPanel() {
         const totalInvCost = invData.reduce((sum, item) => sum + Math.round((item.stock_quantity * item.cost_price) / 1000), 0);
 
         // Fetch today's sales from ledger worker query
-        const todaySalesRaw = await runHeavyAuditReport(
-          "SELECT COALESCE(SUM(total_amount), 0) as total FROM transactions WHERE date(date) = date('now')"
-        );
+        const todaySalesRaw = await runHeavyAuditReport('TODAY_SALES');
         const todaySales = todaySalesRaw[0]?.total || 0;
 
         // Fetch today's cash collections
-        const todayCollectionsRaw = await runHeavyAuditReport(
-          "SELECT COALESCE(SUM(amount), 0) as total FROM customer_ledger WHERE type = 'CREDIT' AND date(date) = date('now')"
-        );
+        const todayCollectionsRaw = await runHeavyAuditReport('TODAY_COLLECTIONS');
         const todayCollections = todayCollectionsRaw[0]?.total || 0;
 
         setTotals({

@@ -33,6 +33,10 @@ export function isStoreUnlocked(): boolean {
 
 // Lock the store (clear MLEK from memory)
 export function lockStore(): void {
+  const secret = (global as any).mlekSecret;
+  if (Buffer.isBuffer(secret)) {
+    secret.fill(0);
+  }
   (global as any).mlekSecret = null;
   console.log('[DB] Store locked. MLEK cleared from process memory.');
 }
