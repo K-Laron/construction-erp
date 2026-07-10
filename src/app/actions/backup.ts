@@ -22,9 +22,10 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     // Read the backup data
     const rawBuffer = fs.readFileSync(tempBackupPath);
     
-    // Encrypt the entire file buffer via AES-256-GCM
+    // H2: Derive a separate key for backup encryption to avoid reusing MLEK directly for AES-GCM
+    const backupKey = crypto.pbkdf2Sync(secret, 'backup_derivation_salt', 100000, 32, 'sha256');
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', secret, iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', backupKey, iv);
     
     const encrypted = Buffer.concat([
       cipher.update(rawBuffer),

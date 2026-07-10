@@ -72,10 +72,24 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
   
   const cashierId = await getActiveUserId();
 
+  let customerPriceTier = 'Retail';
+  if (customerId) {
+    const cust = db.prepare("SELECT price_tier FROM customers WHERE id = ?").get(customerId) as { price_tier: string } | undefined;
+    if (cust && cust.price_tier) {
+      customerPriceTier = cust.price_tier;
+    }
+  }
+
   let computedSubtotal = 0;
   for (let i = 0; i < items.length; i++) {
-    const invItem = db.prepare("SELECT cost_price FROM inventory WHERE id = ?").get(items[i].itemId) as { cost_price: number };
+    const invItem = db.prepare("SELECT cost_price, selling_price, wholesale_price FROM inventory WHERE id = ?").get(items[i].itemId) as { cost_price: number, selling_price: number, wholesale_price: number };
     if (!invItem) throw new Error(`Item ${items[i].itemId} not found.`);
+    
+    // C1 + H3: Enforce proper price tier server-side
+    const expectedPrice = customerPriceTier === 'Wholesale' ? invItem.wholesale_price : invItem.selling_price;
+    if (items[i].unitPrice !== expectedPrice) {
+      throw new Error(`PRICE_TAMPERING_DETECTED: Item ${items[i].itemId} expected price ${expectedPrice} but got ${items[i].unitPrice}`);
+    }
     
     items[i].unitCost = invItem.cost_price;
     items[i].totalPrice = Math.round(items[i].unitPrice * items[i].quantity / 1000);
@@ -92,6 +106,9 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
   }
 
   if (totalAmount < 0) throw new Error("Total amount cannot be negative.");
+
+  // C2: Force server-side tax recalculation to prevent VAT underreporting
+  tax = Math.round(((computedSubtotal - discount) / 1.12) * 0.12);
 
   // Manager Override Helper
   const verifyOverride = (pin: string | undefined, errorMsg: string) => {

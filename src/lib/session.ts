@@ -1,4 +1,4 @@
-import { getIronSession } from 'iron-session';
+import { getIronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
 
 export interface SessionData {
@@ -6,17 +6,28 @@ export interface SessionData {
   role?: string;
 }
 
-const sessionOptions = {
-  password: process.env.SESSION_PASSWORD || 'complex_password_at_least_32_characters_long_for_iron_session',
+import crypto from 'crypto';
+
+let sessionPassword = process.env.SESSION_PASSWORD;
+if (!sessionPassword) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_PASSWORD environment variable is required in production.');
+  } else {
+    sessionPassword = (global as any).__DEV_SESSION_PASSWORD;
+    if (!sessionPassword) {
+      sessionPassword = crypto.randomBytes(32).toString('hex');
+      (global as any).__DEV_SESSION_PASSWORD = sessionPassword;
+    }
+  }
+}
+
+export const sessionOptions: SessionOptions = {
+  password: sessionPassword as string,
   cookieName: 'construction_erp_session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',
   },
 };
-
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_PASSWORD) {
-  throw new Error('SESSION_PASSWORD environment variable is required in production.');
-}
 
 export async function getSession() {
   const cookieStore = await cookies();

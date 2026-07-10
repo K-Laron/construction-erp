@@ -86,7 +86,9 @@ export async function recordPayment(customerId: string, amount: number, descript
   
   db.transaction(() => {
     // 1. Update customer current balance (decrease outstanding A/R)
-    db.prepare("UPDATE customers SET current_balance = MAX(0, current_balance - ?) WHERE id = ?").run(amount, customerId);
+    db.prepare(`
+      UPDATE customers SET current_balance = current_balance - ? WHERE id = ?
+    `).run(amount, customerId);
 
     // 2. Fetch previous ledger entry's signature for chaining
     const lastEntry = db.prepare(`

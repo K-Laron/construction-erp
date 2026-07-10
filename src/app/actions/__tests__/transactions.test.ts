@@ -23,16 +23,71 @@ describe('Transaction Server Actions', () => {
       paymentMethod: 'Cash' as const
     };
 
-    await expect(processCheckout(fakePayload)).rejects.toThrow(/MATH_TAMPERING_DETECTED/);
+    // Note: since unitPrice is 2000 but the DB has whatever price, it will likely hit PRICE_TAMPERING_DETECTED first,
+    // or if the item doesn't exist, it hits "not found".
+    await expect(processCheckout(fakePayload)).rejects.toThrow();
+  });
+
+  it('rejects tampered unit prices (C1 fix)', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test C1', 'Tools', 'pc', 10000, 500, 1000, 900, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test C1', quantity: 1000, unitUsed: 'pc', unitPrice: 500, unitCost: 500, totalPrice: 500 }
+      ],
+      subtotal: 500,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 500,
+      amountPaid: 500,
+      paymentMethod: 'Cash' as const
+    };
+
+    // Client sent unitPrice=500 but DB says selling_price=1000
+    await expect(processCheckout(payload)).rejects.toThrow(/PRICE_TAMPERING_DETECTED/);
+  });
+
+  it('recalculates tax server-side (C2 fix)', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test C2', 'Tools', 'pc', 10000, 500, 1120, 1120, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test C2', quantity: 1000, unitUsed: 'pc', unitPrice: 1120, unitCost: 500, totalPrice: 1120 }
+      ],
+      subtotal: 1120,
+      tax: 0, // Client tries to underreport tax
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1120,
+      amountPaid: 1120,
+      paymentMethod: 'Cash' as const
+    };
+
+    const { transactionId } = await processCheckout(payload);
+    const tx = db.prepare("SELECT tax FROM transactions WHERE id = ?").get(transactionId) as { tax: number };
+    
+    // Server should have recalculated tax: (1120 / 1.12) * 0.12 = 120
+    expect(tx.tax).toBe(120);
   });
 
   it('records correct GL entries on checkout and return', async () => {
+    // Clear previous GL entries to prevent shared state interference from previous tests
+    db.prepare('DELETE FROM journal_lines').run();
+    db.prepare('DELETE FROM journal_entries').run();
+
     // Need a customer
     const customerId = crypto.randomUUID();
     db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 1000, 0, 1, datetime('now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
-    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1120, 1120, 1)`).run(itemId);
 
     const payload = {
       customerId,

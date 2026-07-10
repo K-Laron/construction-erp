@@ -61,6 +61,16 @@ export async function dispatchDelivery(
 
   const deliveryId = crypto.randomUUID();
 
+  // M2: Validate remaining quantity before dispatching
+  const remaining = await getDeliveryRemainingItems(transactionId);
+  for (const item of items) {
+    const rem = remaining.find(r => r.item_id === item.itemId);
+    if (!rem) throw new Error(`Item ${item.itemId} is not part of this transaction.`);
+    if (item.quantityDelivered > rem.remaining_qty) {
+      throw new Error(`DISPATCH_EXCEEDS_REMAINING: Item ${item.itemId} remaining is ${rem.remaining_qty}, but trying to dispatch ${item.quantityDelivered}.`);
+    }
+  }
+
   db.transaction(() => {
     // 1. Create delivery record
     db.prepare(`

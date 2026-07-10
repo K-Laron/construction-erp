@@ -52,9 +52,10 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
   const balanceDue = Math.max(0, totalAmount - parsedAmountPaid);
   const changeDue = Math.max(0, parsedAmountPaid - totalAmount);
 
-  // Credit warnings
+  // Override logic
   const willExceedCredit = paymentMethod === 'Credit' && selectedCustomer && 
-    (selectedCustomer.current_balance + totalAmount - parsedAmountPaid) > selectedCustomer.credit_limit;
+    (selectedCustomer.current_balance + totalAmount > selectedCustomer.credit_limit);
+  const needsOverride = willExceedCredit || totals.discount > 0;
 
   const handleSubmit = async () => {
     setError('');
@@ -65,8 +66,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
         throw new Error("Customer selection is required for Credit transactions.");
       }
 
-      if (paymentMethod === 'Credit' && willExceedCredit && !overridePin) {
-        throw new Error("Credit Limit Exceeded: Exceeds customer credit limit allowance. Manager Override required.");
+      if (needsOverride && !overridePin) {
+        throw new Error("Manager PIN required for this transaction.");
       }
 
       const payload = {
@@ -175,12 +176,12 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             </div>
           </div>
 
-          {/* Will Exceed Credit Banner */}
-          {willExceedCredit && (
+          {/* Manager Override Banner */}
+          {needsOverride && (
             <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl flex flex-col gap-3">
               <div className="text-rose-300 text-xs flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 animate-pulse" />
-                <span>Credit Limit exceeded. This transaction requires manager approval.</span>
+                <span>{totals.discount > 0 ? "Discount applied." : "Credit Limit exceeded."} This transaction requires manager approval.</span>
               </div>
               <input
                 type="password"
@@ -240,7 +241,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || (willExceedCredit && !overridePin) || (paymentMethod !== 'Credit' && !amountPaidStr)}
+              disabled={loading || (needsOverride && !overridePin) || (paymentMethod !== 'Credit' && !amountPaidStr)}
               type="button"
               className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
             >
