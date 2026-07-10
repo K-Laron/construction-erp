@@ -361,3 +361,8 @@ node scratch/verify-all-modules.js
   - [x] Add ISO8601 timestamps to HMAC hash inputs to prevent replay attacks.
   - [x] Add robust memory-mapped Vitest suite for pure backend server action isolation.
   - [x] Finalize `Shift` typescript maps to strictly match the updated DB schema (`opened_at`, `closed_at`, `closing_cash_actual`, `z_reading_id`).
+  - [x] Add `getSupplierLedger` action to fully parse and enforce the HMAC chain for supplier payables.
+  - [x] Enforce `SESSION_PASSWORD` validation in production for iron-session.
+  - [x] Replace `alert()` with `sonner` toast notifications for shift close feedback.
+  - [x] Add explicit comment explaining combo-payment point-of-sale split logic for `acc-ar`.
+  - [x] Fix TypeScript type mismatch in `isRestock` testing argument.
