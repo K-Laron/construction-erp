@@ -295,4 +295,4 @@ Some migrations require access to decrypted data (e.g., re-encrypting fields und
 ---
 
 > [!TIP]
-> For questions about the security architecture in greater depth, refer to the audit report in `docs/AUDIT_FINAL.md`. For implementation details, see `docs/IMPLEMENTATION_PLAN.md`.
+> For questions about the security architecture in greater depth, refer to the audit report in `docs/developer/AUDIT_FINAL.md`. For implementation details, see `docs/developer/IMPLEMENTATION_PLAN.md`.

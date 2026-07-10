@@ -160,9 +160,9 @@ npm run start
 
 ## Documentation
 
-| Document                                                  | Description              |
-| --------------------------------------------------------- | ------------------------ |
-| [docs/PRD.md](docs/PRD.md)                               | Product Requirements     |
-| [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)| Implementation Plan      |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                  | Deployment Guide         |
-| [docs/AUDIT_FINAL.md](docs/AUDIT_FINAL.md)                | Final Security Audit     |
+| Document                                                                  | Description              |
+| ------------------------------------------------------------------------- | ------------------------ |
+| [docs/developer/PRD.md](docs/developer/PRD.md)                            | Product Requirements     |
+| [docs/developer/IMPLEMENTATION_PLAN.md](docs/developer/IMPLEMENTATION_PLAN.md) | Implementation Plan |
+| [docs/operator/DEPLOYMENT.md](docs/operator/DEPLOYMENT.md)                | Deployment Guide         |
+| [docs/developer/AUDIT_FINAL.md](docs/developer/AUDIT_FINAL.md)            | Final Security Audit     |
