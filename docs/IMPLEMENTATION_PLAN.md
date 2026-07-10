@@ -27,8 +27,8 @@ Build a desktop-first, local-first management suite to operate a complete small-
 - **Description**: Install core production and development packages.
 - **Action**: Run installation command:
   ```bash
-  npm install better-sqlite3 lucide-react clsx tailwind-merge zod
-  npm install -D @types/better-sqlite3
+  npm install better-sqlite3 lucide-react clsx tailwind-merge zod iron-session
+  npm install -D @types/better-sqlite3 vitest
   ```
 - **Approval Metrics**:
   1. `package.json` contains dependencies and devDependencies with zero conflicts.
@@ -140,7 +140,7 @@ Build a desktop-first, local-first management suite to operate a complete small-
   2. expected_cash excludes A/R ledger charge totals.
 
 #### Task 2.8: Schema Migration Engine JS support
-- **Description**: Update the migration script in `src/lib/db.ts` to execute programmatic JS/TS files that load `global.mlekSecret` to modify encrypted columns.
+- **Description**: Update the migration script in `src/lib/db.ts` to execute programmatic JS/TS files that load `global.mlekSecret` to modify encrypted columns. (Use native `require` without `eval` strings to prevent code injection).
 - **Approval Metrics**:
   1. Running migrations executes JS modules.
   2. Programmatic migrations successfully decrypt and migrate GCM-encrypted fields.
@@ -224,7 +224,7 @@ Build a desktop-first, local-first management suite to operate a complete small-
   2. Price override is allowed (visual indication shows overridden prices).
 
 #### Task 5.3: Cart Calculations & Totals
-- **Description**: Implement subtotal, VAT calculation toggle (+12%), delivery fee input, and cart-wide discount input.
+- **Description**: Implement subtotal, VAT calculation toggle (+12%), delivery fee input, and cart-wide discount input. The Server Action must recalculate the total using secure database prices and reject tampered payloads with a `MATH_TAMPERING_DETECTED` error.
 - **Approval Metrics**:
   1. Grand total accurately matches: `(Subtotal - Discount) + Tax + Delivery Fee`.
   2. Grand total updates live as inputs change.
@@ -280,8 +280,8 @@ Build a desktop-first, local-first management suite to operate a complete small-
   2. Profit margin percentage displays correctly for each item in report.
 
 #### Task 7.3: Manager Authorization Gateway Verification
-- **Description**: Implement RBAC session checks for privileged actions (adjusting product cost prices, manually updating inventory, or overriding customer credit limits). Action validation verifies:
-  1. The authenticated user's role is strictly `Manager` or `Admin`.
+- **Description**: Implement RBAC session checks (via secure, HttpOnly `iron-session` cookies) for privileged actions (adjusting product cost prices, manually updating inventory, or overriding customer credit limits). Action validation verifies:
+  1. The authenticated user's session role is strictly `Manager` or `Admin`.
   2. `global.mlekSecret` is resident in server process memory, verifying the store was successfully unlocked with the DOP passphrase on boot.
 - **Approval Metrics**:
   1. Privileged endpoints reject calls if role is `Cashier`, or if `global.mlekSecret` is null/empty.
@@ -326,6 +326,10 @@ Build a desktop-first, local-first management suite to operate a complete small-
 ## Verification Plan
 
 ### Automated Tests
+Execute the vitest logic test runner:
+```bash
+npm run test
+```
 Execute the complete integration test script validating schemas, locking triggers, and IP rate limits:
 ```bash
 node scratch/verify-all-modules.js

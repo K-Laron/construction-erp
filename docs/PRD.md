@@ -61,7 +61,9 @@ To avoid operational deadlocks where cashiers cannot boot the registers without 
 - **Storage Rules**: The `system_config` table stores two copies of the MLEK:
   1. `mlek_encrypted_dop`: MLEK encrypted with a key derived from the DOP using **PBKDF2-SHA512 with 100,000 iterations**.
   2. `mlek_encrypted_mmp`: MLEK encrypted with a key derived from the 12-word MMP using **PBKDF2-SHA512 with 600,000 iterations**.
-- **Volatile Execution**: Decrypting either DOP or MMP loads the MLEK into `global.mlekSecret`.
+- **Volatile Execution & Zero-Filling**: Decrypting either DOP or MMP loads the MLEK into `global.mlekSecret` as a `Buffer`. When the store is locked, the `Buffer` is explicitly zero-filled (`secret.fill(0)`) to ensure the cryptographic material is erased from the V8 heap and cannot be extracted from a core dump before the variable is set to `null`.
+- **SQL Injection & Query Prevention**: Worker threads (`reportQuery.js`) are utilized to run heavy audit queries without blocking the event loop. To prevent SQL Injection via Server Actions, the API strictly rejects arbitrary query strings. Clients pass predefined Enum keys (e.g., `'TODAY_SALES'`), which map to secure, hardcoded SQL strings on the server.
+- **Math Tampering Prevention**: All Point-Of-Sale transactions are re-calculated on the server using trusted database pricing. If a malicious client attempts to modify the subtotal payload, the server action throws a `MATH_TAMPERING_DETECTED` error and aborts the transaction.
 
 $$\text{Entry } N \text{ Hash} = \text{HMAC-SHA256}(\text{data} + \text{Entry } N-1 \text{ Hash}, \text{global.mlekSecret})$$
 
