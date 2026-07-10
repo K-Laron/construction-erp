@@ -93,6 +93,26 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
 
   if (totalAmount < 0) throw new Error("Total amount cannot be negative.");
 
+  // Manager Override Helper
+  const verifyOverride = (pin: string | undefined, errorMsg: string) => {
+    if (!pin) throw new Error(errorMsg);
+    const managers = db.prepare("SELECT passcode_hash, passcode_salt FROM users WHERE role IN ('Admin', 'Manager') AND is_active = 1").all() as { passcode_hash: string, passcode_salt: string }[];
+    let valid = false;
+    for (const mgr of managers) {
+      const hash = crypto.pbkdf2Sync(pin, mgr.passcode_salt, 600000, 32, 'sha512').toString('hex');
+      if (hash === mgr.passcode_hash) {
+        valid = true;
+        break;
+      }
+    }
+    if (!valid) throw new Error("Invalid Manager Override PIN.");
+  };
+
+  // Discount enforcement
+  if (discount > 0) {
+    verifyOverride(payload.overridePin, "DISCOUNT_OVERRIDE_REQUIRED: Manager override required for discounts.");
+  }
+
   // Credit limit enforcement
   if (paymentMethod === 'Credit' && customerId) {
     const customer = db.prepare("SELECT credit_limit, current_balance FROM customers WHERE id = ?").get(customerId) as {
@@ -101,22 +121,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     };
 
     if (customer && (customer.current_balance + totalAmount - amountPaid) > customer.credit_limit) {
-      if (payload.overridePin) {
-        const managers = db.prepare("SELECT passcode_hash, passcode_salt FROM users WHERE role IN ('Admin', 'Manager') AND is_active = 1").all() as { passcode_hash: string, passcode_salt: string }[];
-        let valid = false;
-        for (const mgr of managers) {
-          const hash = crypto.pbkdf2Sync(payload.overridePin, mgr.passcode_salt, 600000, 32, 'sha512').toString('hex');
-          if (hash === mgr.passcode_hash) {
-            valid = true;
-            break;
-          }
-        }
-        if (!valid) {
-          throw new Error("CREDIT_LIMIT_EXCEEDED: Invalid Manager Override PIN.");
-        }
-      } else {
-        throw new Error("CREDIT_LIMIT_EXCEEDED: Customer credit limit would be exceeded by this transaction.");
-      }
+      verifyOverride(payload.overridePin, "CREDIT_LIMIT_EXCEEDED: Customer credit limit would be exceeded by this transaction.");
     }
   }
 
@@ -187,9 +192,9 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
       const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
 
       db.prepare(`
-        INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature)
-        VALUES (?, ?, ?, 'DEBIT', ?, ?, ?, ?)
-      `).run(ledgerId, customerId, entryData.date, balanceDue, transactionId, entryData.description, signature);
+        INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
+        VALUES (?, ?, ?, 'DEBIT', ?, ?, ?, ?, ?)
+      `).run(ledgerId, customerId, entryData.date, entryData.amount, transactionId, entryData.description, signature, cashierId);
     }
 
     // 6. G/L Journal Entries
@@ -325,7 +330,7 @@ export async function processReturn(
               const ledgerId = crypto.randomUUID();
               const entryData = { id: ledgerId, customer_id: tx.customer_id, date: new Date().toISOString(), type: 'CREDIT' as const, amount: actualCreditRefund, reference_id: transactionId, description: `Return on Txn ${transactionId.slice(0, 8)}` };
               const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
-              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature) VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, entryData.date, actualCreditRefund, transactionId, entryData.description, signature);
+              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id) VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, entryData.date, actualCreditRefund, transactionId, entryData.description, signature, cashierId);
             }
           } else {
             glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: refundAmount });

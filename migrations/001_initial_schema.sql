@@ -206,7 +206,7 @@ BEGIN
 
   UPDATE transactions
   SET official_receipt_number = COALESCE((SELECT MAX(official_receipt_number) FROM transactions), 50000) + 1
-  WHERE id = NEW.id AND NEW.delivery_fee > 0;
+  WHERE id = NEW.id AND (NEW.delivery_fee > 0 OR NEW.payment_method = 'Cash');
 END;
 
 -- 9. Supplier Purchases

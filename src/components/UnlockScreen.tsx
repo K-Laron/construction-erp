@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Lock, KeyRound, ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react';
+import bip39Words from '@/lib/wordlist.json';
 
 interface UnlockScreenProps {
   isFirstBoot: boolean;
@@ -40,16 +41,7 @@ export default function UnlockScreen({ isFirstBoot, onUnlockSuccess }: UnlockScr
     setLoading(true);
     try {
       // Generate 12 random mnemonic words
-      const wordList = [
-        'alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot',
-        'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima',
-        'mike', 'november', 'oscar', 'papa', 'quebec', 'romeo',
-        'sierra', 'tango', 'uniform', 'victor', 'whiskey', 'xray',
-        'yankee', 'zulu', 'anchor', 'barrel', 'canyon', 'dagger',
-        'falcon', 'gravel', 'harbor', 'iron', 'jasper', 'knight',
-        'lantern', 'marble', 'nexus', 'opal', 'prism', 'quarry',
-        'rivet', 'saber', 'timber', 'umbra', 'vertex', 'wrench'
-      ];
+      const wordList = bip39Words as string[];
 
       const words: string[] = [];
       for (let i = 0; i < 12; i++) {

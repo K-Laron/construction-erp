@@ -4,8 +4,9 @@ import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
 import { Customer, CustomerLedgerEntry } from '@/types';
 import crypto from 'crypto';
-import { calculateHMACSignature } from '@/lib/ledger_crypto';
+import { getMlekSecret, calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
+import { getActiveUserId } from './auth';
 
 // Helper to check for MLEK
 function getMlekSecret(): Buffer {
@@ -81,10 +82,11 @@ export async function getCustomerLedger(customerId: string): Promise<{ ledger: C
 // Receive cash payment and post credit ledger entry
 export async function recordPayment(customerId: string, amount: number, description: string): Promise<string> {
   const ledgerId = crypto.randomUUID();
+  const cashierId = await getActiveUserId();
   
   db.transaction(() => {
     // 1. Update customer current balance (decrease outstanding A/R)
-    db.prepare("UPDATE customers SET current_balance = current_balance - ? WHERE id = ?").run(amount, customerId);
+    db.prepare("UPDATE customers SET current_balance = MAX(0, current_balance - ?) WHERE id = ?").run(amount, customerId);
 
     // 2. Fetch previous ledger entry's signature for chaining
     const lastEntry = db.prepare(`
@@ -108,9 +110,9 @@ export async function recordPayment(customerId: string, amount: number, descript
     const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
 
     db.prepare(`
-      INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature)
-      VALUES (?, ?, ?, 'CREDIT', ?, NULL, ?, ?)
-    `).run(ledgerId, customerId, entryData.date, amount, description, signature);
+      INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
+      VALUES (?, ?, ?, 'CREDIT', ?, NULL, ?, ?, ?)
+    `).run(ledgerId, customerId, entryData.date, amount, description, signature, cashierId);
 
     // 4. Record G/L Journal Entry
     // Debit Cash Drawer (1010) - Cash increases
@@ -121,7 +123,7 @@ export async function recordPayment(customerId: string, amount: number, descript
         { accountId: 'acc-cash', type: 'DEBIT', amount },
         { accountId: 'acc-ar', type: 'CREDIT', amount }
       ],
-      'system-daemon'
+      (global as any).__activeUserId || 'system-daemon' // Fallback for tests if needed
     );
   })();
 

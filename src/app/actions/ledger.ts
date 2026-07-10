@@ -53,6 +53,11 @@ export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COL
     throw new Error(`Invalid report type: ${reportType}`);
   }
 
+  // M5 Fix: Skip worker thread if running on an in-memory database (tests)
+  if ((db as any).memory) {
+    return db.prepare(query).all(...params);
+  }
+
   return new Promise((resolve, reject) => {
     const worker = new Worker(path.resolve(process.cwd(), 'src/lib/workers/reportQuery.js'), {
       workerData: { query, params }

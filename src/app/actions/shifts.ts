@@ -48,8 +48,8 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
   const collections = db.prepare(`
     SELECT COALESCE(SUM(amount), 0) as total 
     FROM customer_ledger 
-    WHERE type = 'CREDIT' AND date >= ? AND date <= datetime('now')
-  `).get(shift.opened_at) as { total: number };
+    WHERE type = 'CREDIT' AND cashier_id = ? AND date >= ? AND date <= datetime('now')
+  `).get(shift.cashier_id, shift.opened_at) as { total: number };
 
   const expectedCash = shift.opening_float + cashSales.total + collections.total;
   const discrepancy = actualCash - expectedCash;

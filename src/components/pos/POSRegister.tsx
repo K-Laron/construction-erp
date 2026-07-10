@@ -158,6 +158,11 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-accent-500 animate-spin" />
           </div>
+        ) : inventory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+            <p>No products available.</p>
+            <p className="text-sm">Please add items to the inventory.</p>
+          </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-2">
             <AlertTriangle className="w-10 h-10 text-slate-400" />

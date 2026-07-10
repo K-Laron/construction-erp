@@ -87,6 +87,10 @@ export async function createUser(
   checkMlek();
   const createdBy = await checkManagerRole();
 
+  if (!pin || pin.length < 6) {
+    throw new Error("PIN must be at least 6 characters long.");
+  }
+
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(pin, salt, 600000, 32, 'sha512').toString('hex');
   const userId = crypto.randomUUID();

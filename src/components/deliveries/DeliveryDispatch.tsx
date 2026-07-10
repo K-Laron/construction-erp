@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { Truck, CheckCircle2, ChevronDown, ChevronUp, Loader2, Calendar } from 'lucide-react';
 import { getPendingDeliveries, getDeliveryHistory, confirmDelivery } from '@/app/actions/deliveries';
 import { formatCurrency, formatDate, formatQuantity } from '@/lib/format';
+import Modal from '@/components/ui/Modal';
 import DispatchModal from './DispatchModal';
 
 export default function DeliveryDispatch() {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDeliveryId, setConfirmDeliveryId] = useState<string | null>(null);
   
   // Expandable row state
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
@@ -51,9 +53,13 @@ export default function DeliveryDispatch() {
   };
 
   const handleConfirmTrip = async (deliveryId: string) => {
-    if (!confirm("Are you sure you want to mark this trip as Fully Delivered?")) return;
+    setConfirmDeliveryId(deliveryId);
+  };
+
+  const executeConfirmTrip = async () => {
+    if (!confirmDeliveryId) return;
     try {
-      await confirmDelivery(deliveryId);
+      await confirmDelivery(confirmDeliveryId);
       if (expandedTxId) {
         const data = await getDeliveryHistory(expandedTxId);
         setTrips(data);
@@ -61,6 +67,8 @@ export default function DeliveryDispatch() {
       loadPending();
     } catch (err) {
       console.error(err);
+    } finally {
+      setConfirmDeliveryId(null);
     }
   };
 
@@ -208,6 +216,15 @@ export default function DeliveryDispatch() {
           onSuccess={loadPending}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <Modal isOpen={!!confirmDeliveryId} onClose={() => setConfirmDeliveryId(null)} title="Confirm Delivery" size="sm">
+        <p className="text-slate-300 mb-6">Are you sure you want to mark this trip as Fully Delivered?</p>
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={() => setConfirmDeliveryId(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm transition-colors">Cancel</button>
+          <button onClick={executeConfirmTrip} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm transition-colors">Confirm</button>
+        </div>
+      </Modal>
     </div>
   );
 }
