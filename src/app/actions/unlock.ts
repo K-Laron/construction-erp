@@ -76,9 +76,9 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
       insertConfig.run('dop_salt', dopSalt);
       insertConfig.run('mmp_salt', mmpSalt);
 
-      // Seed default admin user (username: admin, PIN: 6-digit random)
+      // Seed default admin user (username: admin, PIN: 6-digit secure random)
       const adminSalt = crypto.randomBytes(16).toString('hex');
-      adminPin = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
+      adminPin = crypto.randomInt(100000, 999999).toString();
       const adminHash = crypto.pbkdf2Sync(adminPin, adminSalt, 600000, 32, 'sha512').toString('hex');
 
       db.prepare(`

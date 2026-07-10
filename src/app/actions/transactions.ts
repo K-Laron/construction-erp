@@ -31,6 +31,7 @@ export interface CheckoutPayload {
   amountPaid: number;
   paymentMethod: 'Cash' | 'Credit' | 'Check';
   overridePin?: string;
+  overrideUsername?: string;
 }
 
 const CartItemSchema = z.object({
@@ -53,7 +54,8 @@ export const CheckoutPayloadSchema = z.object({
   totalAmount: z.number().int().nonnegative(),
   amountPaid: z.number().int().nonnegative(),
   paymentMethod: z.enum(['Cash', 'Credit', 'Check']),
-  overridePin: z.string().optional()
+  overridePin: z.string().optional(),
+  overrideUsername: z.string().optional()
 });
 
 export const ProcessReturnSchema = z.object({
@@ -73,7 +75,8 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
   const payload = CheckoutPayloadSchema.parse(rawPayload);
   const {
     customerId, items, subtotal,
-    deliveryFee, discount, totalAmount, amountPaid, paymentMethod
+    deliveryFee, discount, totalAmount, amountPaid, paymentMethod,
+    overridePin, overrideUsername
   } = payload;
   let { tax } = payload;
   
@@ -120,11 +123,21 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
   tax = isVatExempt ? 0 : Math.round(((computedSubtotal - discount) / 1.12) * 0.12);
 
   // Manager Override Helper
-  const verifyOverride = (pin: string | undefined, errorMsg: string) => {
+  const verifyOverride = (pin: string | undefined, managerUsername: string | undefined, errorMsg: string) => {
     if (!pin) throw new Error(errorMsg);
+    
+    if (managerUsername) {
+      const mgr = db.prepare("SELECT passcode_hash, passcode_salt FROM users WHERE username = ? AND role IN ('Admin', 'Manager') AND is_active = 1").get(managerUsername) as { passcode_hash: string, passcode_salt: string } | undefined;
+      if (!mgr) throw new Error("Invalid Manager Username.");
+      const hash = crypto.pbkdf2Sync(pin, mgr.passcode_salt, 600000, 32, 'sha512').toString('hex');
+      if (hash !== mgr.passcode_hash) throw new Error("Invalid Manager Override PIN.");
+      return;
+    }
+
     const managers = db.prepare("SELECT passcode_hash, passcode_salt FROM users WHERE role IN ('Admin', 'Manager') AND is_active = 1").all() as { passcode_hash: string, passcode_salt: string }[];
     let valid = false;
-    for (const mgr of managers) {
+    // Fallback: search all but limit loop length to prevent DoS (max 3 managers checked)
+    for (const mgr of managers.slice(0, 3)) {
       const hash = crypto.pbkdf2Sync(pin, mgr.passcode_salt, 600000, 32, 'sha512').toString('hex');
       if (hash === mgr.passcode_hash) {
         valid = true;
@@ -136,7 +149,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
 
   // Discount enforcement
   if (discount > 0) {
-    verifyOverride(payload.overridePin, "DISCOUNT_OVERRIDE_REQUIRED: Manager override required for discounts.");
+    verifyOverride(overridePin, overrideUsername, "DISCOUNT_OVERRIDE_REQUIRED: Manager override required for discounts.");
   }
 
   // Credit limit enforcement
@@ -147,7 +160,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
     };
 
     if (customer && (customer.current_balance + totalAmount - amountPaid) > customer.credit_limit) {
-      verifyOverride(payload.overridePin, "CREDIT_LIMIT_EXCEEDED: Customer credit limit would be exceeded by this transaction.");
+      verifyOverride(overridePin, overrideUsername, "CREDIT_LIMIT_EXCEEDED: Customer credit limit would be exceeded by this transaction.");
     }
   }
 

@@ -31,13 +31,22 @@ export default function Home() {
       const status = await getStoreStatus();
       setIsConfigured(status.isConfigured);
       setIsUnlocked(status.isUnlocked);
-    } catch (err) {
+      if (!status.isUnlocked) {
+        setCurrentUser(null);
+      }
+    } catch (err: any) {
       logger.error(String(err), err);
+      if (err.message?.includes('DATABASE_LOCKED') || err.message?.includes('UNAUTHORIZED')) {
+        setIsUnlocked(false);
+        setCurrentUser(null);
+      }
     }
   };
 
   useEffect(() => {
     checkStatus();
+    const interval = setInterval(checkStatus, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLockStore = async () => {

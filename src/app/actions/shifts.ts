@@ -126,20 +126,20 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
 
 // Get the current open shift for a cashier
 export async function getCurrentShift(_ignoredCashierId: string): Promise<any | null> {
-  checkMlek();
+  checkMlek(false);
   const cashierId = await getActiveUserId();
   return db.prepare("SELECT * FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) || null;
 }
 
 // Get Z-Reading for a closed shift
 export async function getZReading(shiftId: string): Promise<any | null> {
-  checkMlek();
+  checkMlek(false);
   return db.prepare("SELECT * FROM shift_z_readings WHERE shift_id = ?").get(shiftId) || null;
 }
 
 // Get all shifts (paginated)
 export async function getShiftHistory(limit: number = 50, offset: number = 0): Promise<any[]> {
-  checkMlek();
+  checkMlek(false);
   return db.prepare(`
     SELECT s.*, u.name as cashier_name 
     FROM shifts s 
