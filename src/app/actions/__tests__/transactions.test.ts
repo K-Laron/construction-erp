@@ -10,6 +10,7 @@ describe('Transaction Server Actions', () => {
   it('rejects tampered checkout payloads with incorrect math', async () => {
     const fakePayload = {
       customerId: null,
+      cashierId: 'system-daemon',
       items: [
         { itemId: 'item-blocks-4', name: 'Hollow Block 4"', quantity: 1000, unitUsed: 'pc', unitPrice: 2000, unitCost: 1500, totalPrice: 2000 }
       ],
@@ -35,6 +36,7 @@ describe('Transaction Server Actions', () => {
 
     const payload = {
       customerId,
+      cashierId: 'system-daemon',
       items: [
         { itemId, name: 'Test', quantity: 1000, unitUsed: 'pc', unitPrice: 1120, unitCost: 500, totalPrice: 1120 }
       ],

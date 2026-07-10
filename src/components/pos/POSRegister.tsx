@@ -335,7 +335,6 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
               >
                 {taxEnabled ? 'Enabled' : 'Disabled'}
               </button>
-              </button>
             </div>
             {!taxEnabled && (
               <div className="text-[10px] text-amber-500/80 leading-tight">

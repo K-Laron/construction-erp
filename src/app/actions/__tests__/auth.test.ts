@@ -37,6 +37,7 @@ describe('Auth Actions', () => {
     // Try checkout that exceeds credit limit
     const payload = {
       customerId,
+      cashierId: userId,
       items: [
         { itemId, name: 'Test', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
       ],
