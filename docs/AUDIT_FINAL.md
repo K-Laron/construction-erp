@@ -40,3 +40,13 @@ All 7 tests across 5 test suites (Auth, Inventory, Ledger, Shifts, Transactions)
 - **L2 (Worker DB Path):** Removed hardcoded `'data/database.db'` path in `src/lib/workers/reportQuery.js`. The `dbPath` is now dynamically passed through `workerData` from the main thread, making it work for dynamically assigned database files in tests or production.
 - **L4 (Test Coverage Gaps):** Added test coverage in `transactions.test.ts` for Credit returns, VAT-exempt checkout flow, and full order cancellations (returns).
 - **L5 (Stock Audit Trail):** Added direction-aware stock movement logging. Every `STOCK_IN` (receive goods, returns) and `STOCK_OUT` (sales/checkouts) now logs an explicit trace containing old stock quantity and new stock quantity directly into `system_audit_logs`.
+
+## Phase 7 Prioritized Improvements
+- **H1 (Hardcoded Admin PIN):** The `bootstrapStore` function now generates a cryptographically random 6-digit PIN for the default `admin` account instead of `123456`, displaying it once during initial setup in the `<UnlockScreen>`.
+- **H2 (Unencrypted Backup Temp File):** Backups now write `VACUUM INTO` to the OS temporary directory (`os.tmpdir()`) with a UUID filename, and safely clean up via a `try/catch` in a `finally` block to prevent lingering plaintext DB files.
+- **H3 (System Daemon Zero Hash):** The `system-daemon` user is now seeded using `crypto.randomBytes(32)` for its hash and `crypto.randomBytes(8)` for its salt, eliminating the zero-hash vulnerability.
+- **M2 (Unused Imports):** Ran a comprehensive cleanup across `src/app/actions` and `src/lib`, removing all unused `crypto`, `mlek`, and type imports to resolve ESLint noise.
+- **M3 & M4 (Transaction TOCTOU Races):** 
+  - **Delivery Validation:** `remaining_qty` checks are now performed synchronously inside the `db.transaction()` block in `dispatchDelivery`.
+  - **Rate-Limiting:** IP and Account lockout checks in `authenticateUser` are now isolated inside a `db.transaction()` which optimistically inserts an `is_successful = 0` attempt before yielding to the slow `pbkdf2Sync` hash check, updating to `1` only if the hash matches.
+- **L1 (Production Console Logs):** Filtered non-critical `console.log` statements in `db.ts` and `init.ts` behind a `process.env.NODE_ENV !== 'production'` check.
