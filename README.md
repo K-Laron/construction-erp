@@ -1,60 +1,156 @@
 # Construction Supply POS & ERP
 
-A completely local-first, offline-capable Enterprise Resource Planning (ERP) suite and Point of Sale (POS) system designed specifically for small-to-medium construction supply businesses.
+**Next.js 16 (App Router) · SQLite (WAL) · Tailwind CSS v4 · TypeScript · Vitest · PWA**
 
-## Features
+A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning system purpose-built for construction supply retailers. Designed for harsh daylight environments with a minimal Apple-style "Bento-box" UI, enterprise-grade security, and full BIR compliance.
 
-- **Local-First & Offline Capable:** Runs locally on a SQLite database. No internet required. Perfect for warehouses or remote store locations.
-- **Minimal Apple-Style UI:** Built with a clean, high-contrast, "Bento-box" inspired design. Crisp white panels, neutral surfaces, and interactive blue accents ensure maximum daylight readability and ease of use for staff.
-- **Double-Entry General Ledger:** An integrated double-entry accounting engine automatically keeps your books balanced with every transaction.
-- **Inventory & Supply Chain:** Granular tracking in scaled integer millicounts to prevent decimal drift. Includes Supplier Procurement (PO to Goods Receipt) and low stock alerts.
-- **Customer CRM & Credit Ledger:** Track customer credit limits, manage post-dated checks, and generate chronological statements of account.
-- **Labor & Payroll Management:** Track hourly timecards, piece-rate fabrication logs, and generate payslips directly.
-- **Enterprise-Grade Security:**
-  - Role-Based Access Control (Cashier, Manager, Admin).
-  - PBKDF2-SHA512 key derivation with AES-256-GCM encryption for sensitive PII.
-  - HMAC-SHA256 ledger chaining for tamper detection.
+---
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router)
-- **Database:** SQLite (`better-sqlite3`)
-- **Styling:** Tailwind CSS v4
-- **Icons:** Lucide React
+| Layer       | Technology                          |
+| ----------- | ----------------------------------- |
+| Framework   | Next.js 16 (App Router)             |
+| Database    | SQLite via better-sqlite3, WAL mode |
+| Styling     | Tailwind CSS v4                     |
+| Icons       | Lucide React                        |
+| Testing     | Vitest                              |
+| Offline     | PWA (manifest.json + sw.js)         |
+
+## Features
+
+### Core Operations
+
+- **Point of Sale** — Fast checkout with server-side price validation and tax recalculation to prevent client-side tampering and VAT underreporting
+- **Inventory Management** — Millicount precision (eliminates decimal drift), supplier procurement, and low-stock alerts
+- **Customer CRM** — Encrypted PII (AES-256-GCM), credit limits, and HMAC-chained ledger entries
+- **Double-Entry General Ledger** — Balanced journal entries with cryptographic integrity verification
+- **Delivery Dispatch** — TOCTOU-safe validation inside database transactions
+- **Shift Management** — Z-readings with BIR-compliant vatable sales extraction
+
+### Architecture
+
+- **Local-first & offline-capable** — SQLite database, no internet required, installable as a PWA
+- **High-contrast daylight readability** — Minimal Bento-box UI optimized for outdoor/warehouse environments
+- **A5 landscape print engine** — Receipt generation for thermal and standard printers
+- **Structured error handling** — All server actions return `{ success, data, error }`; `ErrorBoundary` component for UI crash isolation
+
+## Security
+
+> [!IMPORTANT]
+> 8 rounds of comprehensive security audits completed. All High, Medium, and Low severity findings resolved. Zero known security vulnerabilities.
+
+### Authentication & Access Control
+
+- **RBAC** with three roles: Cashier, Manager, Admin
+- **PBKDF2-SHA512 key derivation** — 100K iterations (DOP), 600K iterations (MMP/PIN)
+- **Cryptographically random admin PIN** generated on bootstrap (no hardcoded credentials)
+- **System daemon** seeded with a random unreachable hash
+- **Rate-limited authentication** with IP and account lockouts (transactional)
+- **Session cookies** via iron-session with enforced production password
+
+### Data Protection
+
+- **AES-256-GCM encryption** for all customer PII
+- **HMAC-SHA256 ledger chaining** with timestamps for tamper detection
+- **Derived backup encryption key** (PBKDF2 from MLEK — not raw key reuse)
+- **Server-side price validation** against DB (prevents client price tampering)
+- **Server-side tax recalculation** (prevents VAT underreporting)
+
+## Codebase Overview
+
+```
+src/
+├── app/actions/        # 10 server actions
+│   ├── auth            # Authentication & rate limiting
+│   ├── backup          # Encrypted backup/restore
+│   ├── customers       # CRM operations
+│   ├── deliveries      # Dispatch management
+│   ├── inventory       # Stock & procurement
+│   ├── ledger          # General ledger entries
+│   ├── shifts          # Shift & Z-reading management
+│   ├── store           # Store configuration
+│   ├── transactions    # POS transactions
+│   └── unlock          # Bootstrap & PIN management
+│
+├── lib/                # 9 shared libraries
+│   ├── crypto          # AES-256-GCM encryption
+│   ├── db              # SQLite connection (WAL mode)
+│   ├── format          # Number & currency formatting
+│   ├── init            # Database initialization
+│   ├── ledger_crypto   # HMAC-SHA256 chaining
+│   ├── ledger_helpers  # Ledger utilities
+│   ├── mlek            # Master Ledger Encryption Key
+│   ├── session         # iron-session management
+│   └── utils           # General utilities
+│
+├── components/         # 20 components
+│   ├── crm/            # Customer management UI
+│   ├── deliveries/     # Delivery dispatch UI
+│   ├── inventory/      # Stock management UI
+│   ├── maintenance/    # System maintenance UI
+│   ├── pos/            # Point-of-sale UI
+│   ├── print/          # A5 receipt engine
+│   ├── reports/        # Reporting dashboards
+│   └── ui/             # Shared UI primitives
+│
+└── db/migrations/      # 5 SQL migrations
+    ├── 001_initial_schema
+    ├── 002_indexes_and_constraints
+    ├── 003_add_vat_payable
+    ├── 004_hmac_hardening
+    └── 005_add_cashier_id_to_customer_ledger
+```
+
+## Testing
+
+**10 test suites · 20 tests · all passing · tsc --noEmit clean**
+
+All tests run against in-memory SQLite with the full migration suite applied. Worker threads gracefully fall back to inline queries for in-memory databases.
+
+### Server Action Tests (7 suites)
+
+| Suite            | Coverage                                               |
+| ---------------- | ------------------------------------------------------ |
+| `auth`           | Rate limiting, PBKDF2 PIN override                     |
+| `inventory`      | Weighted Average Cost recalculation                    |
+| `ledger`         | HMAC integrity verification                            |
+| `shifts`         | Z-reading reconciliation                               |
+| `transactions`   | Price tampering, tax recalc, credit returns, VAT-exempt, cancellations |
+| `unlock`         | Bootstrap flow, DOP validation                         |
+| `deliveries`     | Dispatch validation                                    |
+
+### Component Tests (3 suites)
+
+| Suite            | Component under test    |
+| ---------------- | ----------------------- |
+| `CheckoutModal`  | Checkout flow UI        |
+| `POSRegister`    | POS register interface  |
+| `PaymentModal`   | Payment processing UI   |
 
 ## Getting Started
 
-Install the dependencies:
+### Development
 
 ```bash
 npm install
+npm run dev
 ```
 
-Run the development server:
+Open [http://localhost:3000](http://localhost:3000). On first launch a cryptographically random admin PIN is generated — follow the on-screen bootstrap instructions.
+
+### Production
 
 ```bash
-npm run dev
-# Or for production:
-npm run build && npm run start
+npm run build
+npm run start
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
 ## Documentation
 
-- [Product Requirements Document (PRD)](./docs/PRD.md)
-- [Implementation Plan](./docs/IMPLEMENTATION_PLAN.md)
-- [Deployment Guide](./docs/DEPLOYMENT.md)
-
-## Security & Auditing
-
-The system has undergone multiple comprehensive security, structural, and integration audits:
-- **Round 3 Deep Audit Resolved:** 100% of identified High and Medium severity logic and security findings (e.g. overpayment negative balance guards, cashier collection scoping, bip39 2048-word mnemonic standards, server-side discount override constraints, and strict PIN entropy) have been successfully mitigated.
-- **Migration Data Integrity:** Schema updates safely preserve constraints without data loss. Includes tracking VAT payable liabilities via `003_add_vat_payable.sql`, supplier ledger HMAC tracking via `004_hmac_hardening.sql`, and robust collections tracking via `005_add_cashier_id_to_customer_ledger.sql`.
-- **Crypto-secure Memory:** Cryptographic routines verified: 600,000 iteration PBKDF2 manager override PIN checks, AES-256-GCM memory encryption, and timestamped HMAC signature chaining preventing tampering and replay attacks.
-- **Accounting Accuracy:** Real-time dynamic Z-Readings strip inclusive tax for strict BIR-compliant `vatable_sales` extraction. The General Ledger securely logs mathematically verified split debits/credits to `acc-revenue` and `acc-vat-payable` independently, correctly reversed during `processReturn`.
-
-## Testing & Validation
-The project boasts thorough continuous integration testing coverage across server actions using Vitest and an in-memory SQLite (`better-sqlite3`) database mapping.
-- **Transactions & Ledgers (`transactions.test.ts`, `ledger.test.ts`):** Math tampering, correct split-journal-entry GL, and HMAC timestamp validations. Worker threads gracefully fallback to inline queries to prevent SQLite memory database deadlocks.
-- **Authentication & Core API (`auth.test.ts`, `shifts.test.ts`, `inventory.test.ts`):** Rate limiting algorithms, WAC array recalculations, and discrepancy reporting all operate under isolated suite scopes.
+| Document                                                  | Description              |
+| --------------------------------------------------------- | ------------------------ |
+| [docs/PRD.md](docs/PRD.md)                               | Product Requirements     |
+| [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)| Implementation Plan      |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                  | Deployment Guide         |
+| [docs/AUDIT_FINAL.md](docs/AUDIT_FINAL.md)                | Final Security Audit     |

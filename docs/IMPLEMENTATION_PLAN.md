@@ -370,3 +370,87 @@ node scratch/verify-all-modules.js
   - [x] Fix test logic in `shifts.test.ts` to properly mock full `amount_paid` cashier match.
   - [x] Add UI warning regarding zero-rated reporting vs inclusive prices when VAT is disabled.
   - [x] Replace `alert()` popups in Maintenance Panel with `sonner` toast notifications.
+
+---
+
+### Phase 11: Final Security Hardening (Completed)
+
+#### Task 11.1: Eliminate Hardcoded Credentials
+- Removed hardcoded admin PIN `123456` from `bootstrapStore`
+- Admin PIN is now cryptographically random 6-digit, displayed once at bootstrap
+- System daemon user seeded with `crypto.randomBytes(32)` hash and `crypto.randomBytes(8)` salt
+- Status: ✅ Complete
+
+#### Task 11.2: Secure Backup Pipeline
+- Backup temp files written to `os.tmpdir()` with UUID filenames
+- Cleanup in `finally` block prevents lingering plaintext DB
+- Backup encryption uses PBKDF2-derived key from MLEK (not raw MLEK reuse)
+- Status: ✅ Complete
+
+#### Task 11.3: Server-Side Price & Tax Validation
+- `processCheckout` fetches customer `price_tier`, validates `unitPrice` against DB `selling_price`/`wholesale_price`
+- Throws `PRICE_TAMPERING_DETECTED` on mismatch
+- Tax recalculated server-side: `Math.round(((computedSubtotal - discount) / 1.12) * 0.12)`
+- Client-supplied tax value is ignored
+- Status: ✅ Complete
+
+#### Task 11.4: TOCTOU Race Condition Fixes
+- Delivery dispatch: `remaining_qty` validation moved inside `db.transaction()`
+- Rate limiting: fail-count check and `login_attempts` INSERT in same transaction
+- Status: ✅ Complete
+
+---
+
+### Phase 12: Structured Error Handling & Type Safety (Completed)
+
+#### Task 12.1: Standardize Server Action Returns
+- All 10 server action files wrapped in `try/catch`
+- Uniform return type: `{ success: boolean; data?: T; error?: string }`
+- `deactivateProduct` and `deactivateCustomer` check `info.changes === 0` for bad IDs
+- `openShift` and `closeShift` validate non-negative inputs
+- Status: ✅ Complete
+
+#### Task 12.2: TypeScript Compliance
+- Reduced `as any` casts to minimal necessary (DB row returns, test mocks)
+- Removed all unused imports across server actions and shared libs
+- `tsc --noEmit` passes with zero errors
+- Status: ✅ Complete
+
+#### Task 12.3: Production Logging
+- All `console.log` statements in `db.ts` and `init.ts` gated behind `process.env.NODE_ENV !== 'production'`
+- Status: ✅ Complete
+
+---
+
+### Phase 13: Testing & PWA (Completed)
+
+#### Task 13.1: Component Test Coverage
+- Added `PaymentModal.test.tsx` — renders modal correctly
+- Added `POSRegister.test.tsx` — loads inventory, renders product grid
+- Added `CheckoutModal.test.tsx` — renders with payment methods, submits checkout
+- All component tests mock server actions via `vi.mock()`
+- Status: ✅ Complete
+
+#### Task 13.2: PWA / Offline Capability
+- Added `public/manifest.json` with standalone display mode and theme colors
+- Added `public/sw.js` service worker for static asset caching
+- Added `src/components/ui/PWA.tsx` component for service worker registration
+- Integrated into `src/app/layout.tsx`
+- Status: ✅ Complete
+
+#### Task 13.3: ErrorBoundary
+- Added `src/components/ui/ErrorBoundary.tsx` wrapping dashboard views
+- Individual tab crashes are isolated, preventing full SPA crashes
+- Status: ✅ Complete
+
+---
+
+## Current Project Health (as of Phase 13)
+- **Test Suites:** 10 (7 server action + 3 component)
+- **Tests:** 20, all passing
+- **TypeScript:** `tsc --noEmit` clean
+- **Security:** Zero known vulnerabilities, zero hardcoded credentials
+- **Migrations:** 5 SQL migrations
+- **Server Actions:** 10, all with structured error returns
+- **Components:** 20
+- **Shared Libraries:** 9
