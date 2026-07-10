@@ -174,6 +174,12 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
       }
 
       updateInventory.run(item.quantity, newWac, item.item_id);
+
+      // L5: Stock audit trail (direction IN)
+      db.prepare(`
+        INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+        VALUES (?, CURRENT_TIMESTAMP, ?, 'STOCK_IN', ?, ?, ?)
+      `).run(crypto.randomUUID(), receivedBy, item.item_id, current.stock_quantity.toString(), newQty.toString());
     }
 
     // 5. Update Supplier balance if Credit

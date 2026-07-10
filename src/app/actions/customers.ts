@@ -116,7 +116,7 @@ export async function recordPayment(customerId: string, amount: number, descript
         { accountId: 'acc-cash', type: 'DEBIT', amount },
         { accountId: 'acc-ar', type: 'CREDIT', amount }
       ],
-      (global as any).__activeUserId || 'system-daemon' // Fallback for tests if needed
+      cashierId
     );
   })();
 

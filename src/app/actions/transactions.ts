@@ -174,7 +174,16 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
         crypto.randomUUID(), transactionId, item.itemId,
         item.quantity, item.unitUsed, item.unitPrice, item.unitCost, item.totalPrice
       );
+      
+      const invItem = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(item.itemId) as { stock_quantity: number };
+      const newStock = invItem.stock_quantity - item.quantity;
       deductStock.run(item.quantity, item.itemId);
+
+      // L5: Stock audit trail (direction OUT)
+      db.prepare(`
+        INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+        VALUES (?, CURRENT_TIMESTAMP, ?, 'STOCK_OUT', ?, ?, ?)
+      `).run(crypto.randomUUID(), cashierId, item.itemId, invItem.stock_quantity.toString(), newStock.toString());
     }
 
     // 3. Retrieve assigned doc numbers from trigger
@@ -309,8 +318,16 @@ export async function processReturn(
 
       db.prepare("UPDATE transaction_items SET quantity_returned = ? WHERE transaction_id = ? AND item_id = ?").run(returnedSoFar + item.quantity, transactionId, item.itemId);
 
-      // Restock inventory
-      db.prepare("UPDATE inventory SET stock_quantity = stock_quantity + ? WHERE id = ?").run(item.quantity, item.itemId);
+      // Restock inventory and log audit trail
+      const invItem = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(item.itemId) as { stock_quantity: number };
+      const newStock = invItem.stock_quantity + item.quantity;
+      db.prepare("UPDATE inventory SET stock_quantity = ? WHERE id = ?").run(newStock, item.itemId);
+
+      // L5: Stock audit trail (direction IN)
+      db.prepare(`
+        INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
+        VALUES (?, CURRENT_TIMESTAMP, ?, 'STOCK_IN', ?, ?, ?)
+      `).run(crypto.randomUUID(), processedBy, item.itemId, invItem.stock_quantity.toString(), newStock.toString());
 
       totalRefundAmount += Math.round(origItem.unit_price * item.quantity / 1000);
       totalCostRefund += Math.round(origItem.unit_cost * item.quantity / 1000);
@@ -346,14 +363,22 @@ export async function processReturn(
           const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
           const ledgerId = crypto.randomUUID();
           
-          const signature = crypto.createHmac('sha256', getMlekSecret() || process.env.MLEK_SECRET || 'fallback_secret')
-            .update(`${ledgerId}:${tx.customer_id}:CREDIT:${actualCreditRefund}:${prevSig}`)
-            .digest('hex');
+          const entryData = {
+            id: ledgerId,
+            customer_id: tx.customer_id,
+            date: new Date().toISOString(),
+            type: 'CREDIT' as const,
+            amount: actualCreditRefund,
+            reference_id: transactionId,
+            description: `Return reversal - Txn ${transactionId.slice(0, 8)}`
+          };
+
+          const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
 
           db.prepare(`
-            INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, cashier_id, hmac_signature)
-            VALUES (?, ?, CURRENT_TIMESTAMP, 'CREDIT', ?, ?, ?, ?)
-          `).run(ledgerId, tx.customer_id, actualCreditRefund, transactionId, processedBy, signature);
+            INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
+            VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)
+          `).run(ledgerId, tx.customer_id, entryData.date, entryData.amount, transactionId, entryData.description, signature, processedBy);
         }
       } else {
         glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: totalRefundAmount });

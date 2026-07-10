@@ -125,4 +125,71 @@ describe('Transaction Server Actions', () => {
     const returnRevLine = db.prepare(`SELECT SUM(amount) as total FROM journal_lines WHERE account_id = 'acc-revenue' AND type = 'DEBIT'`).get() as { total: number };
     expect(returnRevLine.total).toBe(1000);
   });
+
+  it('processes checkout with vat-exempt customer', async () => {
+    const customerId = crypto.randomUUID();
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at) VALUES (?, 'VAT Exempt Cust', 1000, 0, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 1000,
+      paymentMethod: 'Cash' as const
+    };
+
+    const { transactionId } = await processCheckout(payload);
+    const tx = db.prepare("SELECT tax FROM transactions WHERE id = ?").get(transactionId) as { tax: number };
+    
+    // Server should have set tax to 0 because customer is VAT exempt
+    expect(tx.tax).toBe(0);
+  });
+
+  it('handles credit returns and adjusts ledger correctly', async () => {
+    const customerId = crypto.randomUUID();
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Credit Cust', 5000, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Credit Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test Credit Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 0,
+      paymentMethod: 'Credit' as const
+    };
+
+    const { transactionId } = await processCheckout(payload);
+    
+    // Customer balance should be 1000
+    const cust1 = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };
+    expect(cust1.current_balance).toBe(1000);
+
+    // Process full return (cancel)
+    await processReturn(transactionId, [
+      { itemId, quantity: 1000 }
+    ]);
+
+    // Customer balance should be 0 again
+    const cust2 = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };
+    expect(cust2.current_balance).toBe(0);
+  });
 });

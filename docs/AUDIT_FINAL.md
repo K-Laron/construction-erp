@@ -34,3 +34,9 @@ All 7 tests across 5 test suites (Auth, Inventory, Ledger, Shifts, Transactions)
 - **Test Infrastructure Hardening (N5):** Fixed all tests that mutated immutable DB schema (`PRAGMA writable_schema`, `sqlite_master`). Test suites now reliably pass.
 - **SQLite Portability (N7):** Ported non-portable SQLite functions to agnostic formats. Replaced `datetime('now')` with `CURRENT_TIMESTAMP` across 14 codebase files to standardize UTC timestamp behavior and support broader SQL compatibility. Removed `PRAGMA foreign_keys=OFF` from schema migrations.
 - **UI Error Resilience (N8):** Introduced a global `ErrorBoundary` component (`src/components/ui/ErrorBoundary.tsx`) and wrapped the active dashboard view inside `page.tsx`. A crash in one specific dashboard tab (e.g. POS or Inventory) now isolates the error, preventing the entire SPA from crashing and displaying a fatal route error.
+
+## Phase 6 Final Remaining Cleanups (L1-L5)
+- **L1 (Global Fallback Removal):** Removed `(global as any).__activeUserId || 'system-daemon'` from `customers.ts:119` and correctly passed `cashierId`.
+- **L2 (Worker DB Path):** Removed hardcoded `'data/database.db'` path in `src/lib/workers/reportQuery.js`. The `dbPath` is now dynamically passed through `workerData` from the main thread, making it work for dynamically assigned database files in tests or production.
+- **L4 (Test Coverage Gaps):** Added test coverage in `transactions.test.ts` for Credit returns, VAT-exempt checkout flow, and full order cancellations (returns).
+- **L5 (Stock Audit Trail):** Added direction-aware stock movement logging. Every `STOCK_IN` (receive goods, returns) and `STOCK_OUT` (sales/checkouts) now logs an explicit trace containing old stock quantity and new stock quantity directly into `system_audit_logs`.

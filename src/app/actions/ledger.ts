@@ -56,7 +56,7 @@ export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COL
 
   return new Promise((resolve, reject) => {
     const worker = new Worker(path.resolve(process.cwd(), 'src/lib/workers/reportQuery.js'), {
-      workerData: { query, params }
+      workerData: { query, params, dbPath: (db as any).name }
     });
     
     worker.on('message', (msg) => {
