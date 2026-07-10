@@ -23,8 +23,8 @@ export async function openShift(_ignoredCashierId: string, openingFloat: number)
 
   const shiftId = crypto.randomUUID();
   db.prepare(`
-    INSERT INTO shifts (id, cashier_id, start_time, opening_float, expected_cash, status)
-    VALUES (?, ?, datetime('now'), ?, 0, 'Open')
+    INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status)
+    VALUES (?, ?, datetime('now'), ?, 'Open')
   `).run(shiftId, cashierId, openingFloat);
 
   return shiftId;
@@ -39,16 +39,28 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
     throw new Error("SHIFT_NOT_FOUND: No open shift found with that ID.");
   }
 
-  const expectedCash = (shift.expected_cash || 0) + shift.opening_float;
+  const cashSales = db.prepare(`
+    SELECT COALESCE(SUM(amount_paid), 0) as total
+    FROM transactions
+    WHERE cashier_id = ? AND payment_method = 'Cash' AND date >= ? AND date <= datetime('now')
+  `).get(shift.cashier_id, shift.opened_at) as { total: number };
+
+  const collections = db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) as total 
+    FROM customer_ledger 
+    WHERE type = 'CREDIT' AND date >= ? AND date <= datetime('now')
+  `).get(shift.opened_at) as { total: number };
+
+  const expectedCash = shift.opening_float + cashSales.total + collections.total;
   const discrepancy = actualCash - expectedCash;
   const zReadingId = crypto.randomUUID();
 
   db.transaction(() => {
     // 1. Close the shift
     db.prepare(`
-      UPDATE shifts SET end_time = datetime('now'), actual_cash = ?, expected_cash = ?, discrepancy = ?, status = 'Closed'
+      UPDATE shifts SET closed_at = datetime('now'), closing_cash_actual = ?, status = 'Closed', z_reading_id = ?
       WHERE id = ?
-    `).run(actualCash, expectedCash, discrepancy, shiftId);
+    `).run(actualCash, zReadingId, shiftId);
 
     // 2. Compute Z-Reading aggregates
     // Transactions during this shift (between start_time and now, by this cashier)
@@ -56,25 +68,20 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
       SELECT 
         COALESCE(SUM(total_amount), 0) as gross_sales,
         COALESCE(SUM(tax), 0) as vat_collected,
-        COALESCE(SUM(CASE WHEN tax > 0 THEN subtotal ELSE 0 END), 0) as vatable_sales,
+        COALESCE(SUM(CASE WHEN tax > 0 THEN subtotal - tax ELSE 0 END), 0) as vatable_sales,
         COALESCE(SUM(CASE WHEN tax = 0 THEN subtotal ELSE 0 END), 0) as exempt_sales
       FROM transactions 
       WHERE cashier_id = ? AND date >= ? AND date <= datetime('now')
-    `).get(shift.cashier_id, shift.start_time) as any;
+    `).get(shift.cashier_id, shift.opened_at) as any;
 
     // Count voids/returns during this shift
     const voidsCount = db.prepare(`
       SELECT COALESCE(COUNT(*), 0) as total
       FROM system_audit_logs
-      WHERE action_type IN ('SALE_RETURN', 'SALE_VOID') AND timestamp >= ? AND timestamp <= datetime('now')
-    `).get(shift.start_time) as { total: number };
+      WHERE action_type IN ('SALE_RETURN', 'SALE_VOID') AND timestamp >= ? AND timestamp <= datetime('now') AND user_id = ?
+    `).get(shift.opened_at, shift.cashier_id) as { total: number };
 
-    // Collections (payments received)
-    const collections = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total 
-      FROM customer_ledger 
-      WHERE type = 'CREDIT' AND date >= ? AND date <= datetime('now')
-    `).get(shift.start_time) as { total: number };
+    // Collections already calculated above
 
     db.prepare(`
       INSERT INTO shift_z_readings (id, shift_id, date, gross_sales, vat_collected, vatable_sales, exempt_sales, total_voids, total_returns, total_collections)
@@ -116,7 +123,7 @@ export async function getShiftHistory(limit: number = 50, offset: number = 0): P
     SELECT s.*, u.name as cashier_name 
     FROM shifts s 
     JOIN users u ON s.cashier_id = u.id 
-    ORDER BY s.start_time DESC
+    ORDER BY s.opened_at DESC
     LIMIT ? OFFSET ?
   `).all(limit, offset);
 }

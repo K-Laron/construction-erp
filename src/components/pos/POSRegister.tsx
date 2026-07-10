@@ -28,16 +28,18 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
   // Checkout Modal state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  useEffect(() => {
-    async function loadInventory() {
-      try {
-        const data = await getInventory();
-        setInventory(data);
-      } catch (err) {
-        console.error(err);
-      }
-      setLoading(false);
+  const loadInventory = async () => {
+    setLoading(true);
+    try {
+      const data = await getInventory();
+      setInventory(data);
+    } catch (err) {
+      console.error(err);
     }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     loadInventory();
   }, []);
 
@@ -53,7 +55,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
   const handleAddToCart = (item: InventoryItem) => {
     // If quantity is too low, alert but allow
     const existing = cart.find(c => c.itemId === item.id);
-    const addedQty = item.category === 'Aggregates' ? 1000 : 1000; // 1.0 units (millicounts)
+    const addedQty = item.category === 'Aggregates' ? 500 : 1000; // 0.5 or 1.0 units (millicounts)
 
     if (existing) {
       setCart(cart.map(c => c.itemId === item.id 
@@ -96,9 +98,9 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
   const deliveryFee = deliveryFeeStr ? Math.round(parseFloat(deliveryFeeStr) * 100) : 0;
   
   // Tax calculation (12% VAT is included in subtotal if toggled)
-  // VAT = Vatable Sales * 12% -> meaning subtotal is vatable, tax is subtotal * 12%
-  const tax = taxEnabled ? Math.round((subtotal - discount) * 0.12) : 0;
-  const totalAmount = Math.max(0, subtotal - discount + tax + deliveryFee);
+  // VAT = Vatable Sales * 12% -> Extract VAT from inclusive subtotal
+  const tax = taxEnabled ? Math.round(((subtotal - discount) / 1.12) * 0.12) : 0;
+  const totalAmount = Math.max(0, subtotal - discount + deliveryFee);
 
   const getCategoryColor = (cat: string) => {
     switch (cat.toLowerCase()) {
@@ -126,6 +128,14 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
               className="w-full pl-12 pr-4 py-3 bg-white border border-surface-800 rounded-xl text-interactive-600 placeholder-slate-400 focus-ring focus:ring-accent-500/40 focus:border-accent-500 transition-smooth text-sm shadow-sm"
             />
           </div>
+          <button
+            onClick={loadInventory}
+            disabled={loading}
+            className="px-4 py-3 bg-white border border-surface-800 rounded-xl text-slate-500 hover:text-interactive-600 transition-smooth flex items-center gap-2 shadow-sm whitespace-nowrap"
+          >
+            <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="text-sm font-semibold">Refresh</span>
+          </button>
           <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 items-center">
             {categories.map(cat => (
               <button
@@ -383,6 +393,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
           setCart([]);
           setDiscountStr('');
           setDeliveryFeeStr('');
+          loadInventory();
           onCheckoutSuccess(txn);
         }}
         cashierId={cashierId}

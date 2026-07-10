@@ -1,6 +1,6 @@
 "use server";
 
-import db from '@/lib/db';
+import db, { runMigrations } from '@/lib/db';
 import { deriveKey, encryptField, decryptField } from '@/lib/crypto';
 import crypto from 'crypto';
 
@@ -123,7 +123,6 @@ export async function unlockStore(dop: string, ipAddress: string = '127.0.0.1'):
     (global as any).mlekSecret = Buffer.from(decryptedMlek, 'hex');
 
     // Run programmatic JS migrations
-    const { runMigrations } = require('@/lib/db');
     await runMigrations(decryptedMlek);
 
     // Log successful attempt

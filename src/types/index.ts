@@ -99,6 +99,7 @@ export interface SupplierLedgerEntry {
   amount: number; // Stored in centavos
   reference_id: string | null;
   description: string | null;
+  hmac_signature: string | null;
 }
 
 export interface Quotation {
@@ -192,12 +193,10 @@ export interface DeliveryItem {
 export interface Shift {
   id: string;
   cashier_id: string;
-  start_time: string;
-  end_time: string | null;
+  opened_at: string;
+  closed_at: string | null;
   opening_float: number;
-  expected_cash: number | null;
-  actual_cash: number | null;
-  discrepancy: number | null;
+  closing_cash_actual: number | null;
   status: 'Open' | 'Closed';
 }
 

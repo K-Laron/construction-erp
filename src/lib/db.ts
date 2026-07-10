@@ -7,7 +7,7 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const dbPath = path.join(dbDir, 'database.db');
+const dbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(dbDir, 'database.db');
 const db = new Database(dbPath);
 
 // Configure WAL mode and concurrency locks
@@ -103,6 +103,7 @@ function seedSystemData() {
   insertAccount.run('acc-ar', '1110', 'Accounts Receivable', 'Asset');
   insertAccount.run('acc-inv', '1210', 'Inventory Asset', 'Asset');
   insertAccount.run('acc-ap', '2010', 'Accounts Payable', 'Liability');
+  insertAccount.run('acc-vat-payable', '2020', 'VAT Payable', 'Liability');
   insertAccount.run('acc-equity', '3010', 'Owner Equity', 'Equity');
   insertAccount.run('acc-revenue', '4010', 'Sales Revenue', 'Revenue');
   insertAccount.run('acc-cost-of-sales', '5010', 'Cost of Sales', 'Expense');

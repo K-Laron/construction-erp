@@ -127,18 +127,28 @@ export async function getDeliveryHistory(transactionId: string): Promise<any[]> 
   checkMlek();
   const deliveries = db.prepare(`
     SELECT * FROM deliveries WHERE transaction_id = ? ORDER BY delivery_date DESC
-  `).all(transactionId);
+  `).all(transactionId) as any[];
 
-  const result = [];
-  for (const del of deliveries as any[]) {
-    const items = db.prepare(`
-      SELECT di.*, i.name as item_name, i.unit 
-      FROM delivery_items di
-      JOIN inventory i ON di.item_id = i.id
-      WHERE di.delivery_id = ?
-    `).all(del.id);
-    result.push({ ...del, items });
-  }
+  if (deliveries.length === 0) return [];
 
-  return result;
+  const placeholders = deliveries.map(() => '?').join(',');
+  const deliveryIds = deliveries.map(d => d.id);
+  
+  const allItems = db.prepare(`
+    SELECT di.*, i.name as item_name, i.unit 
+    FROM delivery_items di
+    JOIN inventory i ON di.item_id = i.id
+    WHERE di.delivery_id IN (${placeholders})
+  `).all(...deliveryIds) as any[];
+
+  const itemsByDelivery = allItems.reduce((acc, item) => {
+    if (!acc[item.delivery_id]) acc[item.delivery_id] = [];
+    acc[item.delivery_id].push(item);
+    return acc;
+  }, {});
+
+  return deliveries.map(del => ({
+    ...del,
+    items: itemsByDelivery[del.id] || []
+  }));
 }

@@ -30,6 +30,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
   const [amountPaidStr, setAmountPaidStr] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [overridePin, setOverridePin] = useState<string>('');
   const [successData, setSuccessData] = useState<{ transactionId: string; siNumber: number | null; orNumber: number | null } | null>(null);
 
   useEffect(() => {
@@ -64,8 +65,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
         throw new Error("Customer selection is required for Credit transactions.");
       }
 
-      if (paymentMethod === 'Credit' && willExceedCredit) {
-        throw new Error("Credit Limit Exceeded: Exceeds customer credit limit allowance.");
+      if (paymentMethod === 'Credit' && willExceedCredit && !overridePin) {
+        throw new Error("Credit Limit Exceeded: Exceeds customer credit limit allowance. Manager Override required.");
       }
 
       const payload = {
@@ -78,7 +79,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
         discount: totals.discount,
         totalAmount,
         amountPaid: paymentMethod === 'Credit' ? parsedAmountPaid : Math.min(totalAmount, parsedAmountPaid || totalAmount),
-        paymentMethod
+        paymentMethod,
+        overridePin: overridePin || undefined
       };
 
       const result = await processCheckout(payload);
@@ -175,9 +177,18 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
 
           {/* Will Exceed Credit Banner */}
           {willExceedCredit && (
-            <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 animate-pulse" />
-              <span>Credit Limit exceeded. This transaction requires manager approval.</span>
+            <div className="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl flex flex-col gap-3">
+              <div className="text-rose-300 text-xs flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 animate-pulse" />
+                <span>Credit Limit exceeded. This transaction requires manager approval.</span>
+              </div>
+              <input
+                type="password"
+                placeholder="Manager PIN"
+                value={overridePin}
+                onChange={e => setOverridePin(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-rose-900 rounded-lg text-white focus:outline-none focus:border-rose-500 font-semibold text-sm"
+              />
             </div>
           )}
 
@@ -229,7 +240,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || willExceedCredit || (paymentMethod !== 'Credit' && !amountPaidStr)}
+              disabled={loading || (willExceedCredit && !overridePin) || (paymentMethod !== 'Credit' && !amountPaidStr)}
               type="button"
               className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
             >

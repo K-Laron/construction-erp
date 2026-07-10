@@ -19,8 +19,8 @@ fi
 wait_for_server() {
   echo "Waiting for Next.js server to start on port 3000..."
   for i in {1..30}; do
-    # Check port 3000
-    if lsof -i :3000 >/dev/null 2>&1 || netstat -an | grep 3000 >/dev/null 2>&1; then
+    # Check port 3000 using ss
+    if ss -tln | grep -q ":3000 "; then
       echo "Server is live!"
       return 0
     fi
@@ -41,7 +41,7 @@ trap 'kill $SERVER_PID' EXIT
 # Wait for server to bind port
 if wait_for_server; then
   # Open default web browser in Linux
-  URL="https://localhost:3000"
+  URL="http://localhost:3000"
   echo "Opening browser to $URL..."
   
   if command -v xdg-open >/dev/null 2>&1; then

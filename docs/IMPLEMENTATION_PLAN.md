@@ -339,3 +339,21 @@ node scratch/verify-all-modules.js
 1. Verify TLS Secure Context: Navigate to `https://construction-erp.local:3000` and check for green secure symbols.
 2. Verify Shift Close Report: Process credit sales and cash checkouts. Verify that expected shift cash excludes accounts receivable credit checkouts.
 3. Verify Soft Deletion Integrity: Soft-delete a customer record, then check historical ledger sheets to ensure transaction rows are still joined and legible.
+
+---
+
+## Phase 10: Security & Technical Audit Remediation
+- **Objective:** Fix architectural, structural, and security gaps identified during the comprehensive codebase audit.
+- **Tasks:**
+  - [x] Fix SQLite constraint mismatch errors during zero-downtime migrations (`002_indexes_and_constraints.sql`).
+  - [x] Hard-fail dynamic `require()` calls and refactor strictly to ES6 `import` syntax to satisfy bundler invariants.
+  - [x] Cleanse and extract non-async dependencies (`createBalancedJournalEntry`) imported by Next.js Server Actions into neutral helper libraries (`ledger_helpers.ts`) to fix build errors.
+  - [x] Correct math errors in partial credit calculations, VAT extractions, and decimal formatting.
+  - [x] Replace OS-dependent tools (`netstat`/`lsof`) with POSIX-standard tools (`ss`) in launch scripts.
+  - [x] Fix `shifts.ts` `ORDER BY` regression referencing dropped `start_time` column.
+  - [x] Remove phantom `expected_cash` updates from `transactions.ts` on dropped column.
+  - [x] Repair Manager override PIN authentication to query DB salts and use 600,000 iterations.
+  - [x] Separate GL revenue recognition into `acc-revenue` and `acc-vat-payable`.
+  - [x] Create `003_add_vat_payable.sql` and update seed.
+  - [x] Revert VAT from `acc-vat-payable` proportionally during `processReturn` refunds.
+  - [x] Correct Z-reading `vatable_sales` aggregate to strip inclusive tax for BIR compliance.

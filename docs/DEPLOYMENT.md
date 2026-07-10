@@ -13,23 +13,27 @@ This document serves as the operational manual for deploying and maintaining the
    ```bash
    npm install
    ```
-2. Generate locally trusted SSL certificates to allow Secure Contexts (Web Crypto API, secure cookies) over the LAN:
+2. (Optional) Generate locally trusted SSL certificates if you plan to wrap the Node process in an HTTPS proxy:
    ```bash
    ./scripts/setup-certs.sh
    ```
-   *Note: This script will install mkcert and create key.pem and cert.pem in the `./certificates` directory.*
+   *Note: Next.js standalone runs over HTTP by default. For production LAN deployment, run behind an NGINX reverse proxy with TLS.*
 3. Build the application:
    ```bash
    npm run build
    ```
 
 ## 3. Launching the System
-To start the ERP suite and broadcast over the LAN, run:
+To start the ERP suite and broadcast over the LAN, run the automated launcher script:
+```bash
+./run-app.sh
+```
+Or manually:
 ```bash
 npm run start
 ```
-By default, the server binds to `0.0.0.0:3000` over HTTPS.
-Cashiers and managers can access the system from tablets or registers by navigating to `https://construction-erp.local:3000` or the host's IP address.
+By default, the server binds to `0.0.0.0:3000` over HTTP.
+Cashiers and managers can access the system from tablets or registers by navigating to `http://<host-ip>:3000`.
 
 ## 4. Daily Operations & Security
 - **Store Unlock (Daily)**: The system starts in a "Locked" state. Cashiers cannot perform transactions until a Manager enters the Daily Operational Passphrase (DOP) on the main terminal to decrypt the Master Ledger Encryption Key (MLEK) into server memory.

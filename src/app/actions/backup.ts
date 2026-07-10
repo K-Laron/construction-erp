@@ -11,12 +11,13 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     return { success: false, error: "Store is locked." };
   }
 
+  const tempBackupPath = path.resolve(process.cwd(), 'data/backup_temp.db');
+  
   try {
-    const tempBackupPath = path.resolve(process.cwd(), 'data/backup_temp.db');
     if (fs.existsSync(tempBackupPath)) fs.unlinkSync(tempBackupPath);
 
-    // Call better-sqlite3 native WAL-safe backup API
-    await db.backup(tempBackupPath);
+    // Call SQLite native WAL-safe synchronous backup API
+    db.prepare('VACUUM INTO ?').run(tempBackupPath);
 
     // Read the backup data
     const rawBuffer = fs.readFileSync(tempBackupPath);
@@ -31,9 +32,6 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     ]);
     const tag = cipher.getAuthTag();
 
-    // Clean up unencrypted file immediately
-    fs.unlinkSync(tempBackupPath);
-
     // Payload: iv (12 bytes) + tag (16 bytes) + encrypted content
     const finalPayload = Buffer.concat([iv, tag, encrypted]);
     
@@ -44,6 +42,11 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     };
   } catch (err: any) {
     return { success: false, error: err.message };
+  } finally {
+    // Clean up unencrypted file immediately, regardless of cipher success/failure
+    if (fs.existsSync(tempBackupPath)) {
+      fs.unlinkSync(tempBackupPath);
+    }
   }
 }
 

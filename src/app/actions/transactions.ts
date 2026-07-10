@@ -3,7 +3,7 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
-import { createBalancedJournalEntry } from './ledger';
+import { createBalancedJournalEntry, JournalLineInput } from '@/lib/ledger_helpers';
 import { z } from 'zod';
 import { getActiveUserId } from './auth';
 
@@ -28,6 +28,7 @@ export interface CheckoutPayload {
   totalAmount: number;
   amountPaid: number;
   paymentMethod: 'Cash' | 'Credit' | 'Check';
+  overridePin?: string;
 }
 
 const CartItemSchema = z.object({
@@ -49,7 +50,8 @@ export const CheckoutPayloadSchema = z.object({
   discount: z.number().int().nonnegative(),
   totalAmount: z.number().int().nonnegative(),
   amountPaid: z.number().int().nonnegative(),
-  paymentMethod: z.enum(['Cash', 'Credit', 'Check'])
+  paymentMethod: z.enum(['Cash', 'Credit', 'Check']),
+  overridePin: z.string().optional()
 });
 
 function checkMlek(): void {
@@ -84,7 +86,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     throw new Error("MATH_TAMPERING_DETECTED: Submitted subtotal does not match calculated line items.");
   }
   
-  const computedTotal = subtotal - discount + tax + deliveryFee;
+  const computedTotal = subtotal - discount + deliveryFee;
   if (totalAmount !== computedTotal) {
     throw new Error("MATH_TAMPERING_DETECTED: Submitted total amount does not match calculated total.");
   }
@@ -99,13 +101,28 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     };
 
     if (customer && (customer.current_balance + totalAmount - amountPaid) > customer.credit_limit) {
-      throw new Error("CREDIT_LIMIT_EXCEEDED: Customer credit limit would be exceeded by this transaction.");
+      if (payload.overridePin) {
+        const managers = db.prepare("SELECT passcode_hash, passcode_salt FROM users WHERE role IN ('Admin', 'Manager') AND is_active = 1").all() as { passcode_hash: string, passcode_salt: string }[];
+        let valid = false;
+        for (const mgr of managers) {
+          const hash = crypto.pbkdf2Sync(payload.overridePin, mgr.passcode_salt, 600000, 32, 'sha512').toString('hex');
+          if (hash === mgr.passcode_hash) {
+            valid = true;
+            break;
+          }
+        }
+        if (!valid) {
+          throw new Error("CREDIT_LIMIT_EXCEEDED: Invalid Manager Override PIN.");
+        }
+      } else {
+        throw new Error("CREDIT_LIMIT_EXCEEDED: Customer credit limit would be exceeded by this transaction.");
+      }
     }
   }
 
   const transactionId = crypto.randomUUID();
   const balanceDue = totalAmount - amountPaid;
-  const paymentStatus = balanceDue <= 0 ? 'Paid' : 'Partial';
+  const paymentStatus = balanceDue <= 0 ? 'Paid' : (amountPaid === 0 ? 'Unpaid' : 'Partial');
   const deliveryStatus = deliveryFee > 0 ? 'Pending' : 'N/A';
 
   let siNumber: number | null = null;
@@ -144,13 +161,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
     siNumber = txRow?.sales_invoice_number || null;
     orNumber = txRow?.official_receipt_number || null;
 
-    // 4. Update shift expected_cash (only for Cash payments)
-    if (paymentMethod === 'Cash') {
-      const openShift = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) as { id: string } | undefined;
-      if (openShift) {
-        db.prepare("UPDATE shifts SET expected_cash = COALESCE(expected_cash, 0) + ? WHERE id = ?").run(amountPaid, openShift.id);
-      }
-    }
+    // 4. Removed expected_cash update (computed dynamically at closing)
 
     // 5. Customer ledger debit if on credit
     if (paymentMethod === 'Credit' && customerId && balanceDue > 0) {
@@ -177,8 +188,8 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
 
       db.prepare(`
         INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature)
-        VALUES (?, ?, datetime('now'), 'DEBIT', ?, ?, ?, ?)
-      `).run(ledgerId, customerId, balanceDue, transactionId, entryData.description, signature);
+        VALUES (?, ?, ?, 'DEBIT', ?, ?, ?, ?)
+      `).run(ledgerId, customerId, entryData.date, balanceDue, transactionId, entryData.description, signature);
     }
 
     // 6. G/L Journal Entries
@@ -195,7 +206,11 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ tr
       glLines.push({ accountId: 'acc-ar', type: 'DEBIT', amount: balanceDue });
     }
 
-    glLines.push({ accountId: 'acc-revenue', type: 'CREDIT', amount: totalAmount });
+    const revenueAmount = totalAmount - tax;
+    glLines.push({ accountId: 'acc-revenue', type: 'CREDIT', amount: revenueAmount });
+    if (tax > 0) {
+      glLines.push({ accountId: 'acc-vat-payable', type: 'CREDIT', amount: tax });
+    }
 
     // COGS entry
     if (costOfGoods > 0) {
@@ -254,8 +269,10 @@ export async function processReturn(
   const processedBy = await getActiveUserId();
 
   db.transaction(() => {
-    const tx = db.prepare("SELECT payment_method, balance_due, customer_id FROM transactions WHERE id = ?").get(transactionId) as { payment_method: string; balance_due: number; customer_id: string | null };
+    const tx = db.prepare("SELECT payment_method, balance_due, customer_id, tax, total_amount FROM transactions WHERE id = ?").get(transactionId) as { payment_method: string; balance_due: number; customer_id: string | null; tax: number; total_amount: number };
     if (!tx) throw new Error("Transaction not found.");
+
+    let remainingBalance = tx.balance_due;
 
     for (const item of itemsToReturn) {
       const origItem = db.prepare(`
@@ -277,13 +294,19 @@ export async function processReturn(
         const refundAmount = Math.round(origItem.unit_price * item.quantity / 1000);
         const costRefund = Math.round(origItem.unit_cost * item.quantity / 1000);
 
+        const refundVat = tx.tax > 0 && tx.total_amount > 0 ? Math.round(refundAmount * tx.tax / tx.total_amount) : 0;
+        const refundRevenue = refundAmount - refundVat;
+
         // G/L reversal
         const glLines: { accountId: string; type: 'DEBIT' | 'CREDIT'; amount: number }[] = [];
 
         if (refundAmount > 0) {
-          glLines.push({ accountId: 'acc-revenue', type: 'DEBIT', amount: refundAmount });
-          if (tx.payment_method === 'Credit' && tx.balance_due > 0) {
-            const actualCreditRefund = Math.min(refundAmount, tx.balance_due);
+          glLines.push({ accountId: 'acc-revenue', type: 'DEBIT', amount: refundRevenue });
+          if (refundVat > 0) {
+            glLines.push({ accountId: 'acc-vat-payable', type: 'DEBIT', amount: refundVat });
+          }
+          if (tx.payment_method === 'Credit' && remainingBalance > 0) {
+            const actualCreditRefund = Math.min(refundAmount, remainingBalance);
             const remainderCashRefund = refundAmount - actualCreditRefund;
             
             glLines.push({ accountId: 'acc-ar', type: 'CREDIT', amount: actualCreditRefund });
@@ -294,14 +317,14 @@ export async function processReturn(
             if (tx.customer_id) {
               db.prepare("UPDATE customers SET current_balance = MAX(0, current_balance - ?) WHERE id = ?").run(actualCreditRefund, tx.customer_id);
               db.prepare("UPDATE transactions SET balance_due = MAX(0, balance_due - ?) WHERE id = ?").run(actualCreditRefund, transactionId);
-              tx.balance_due -= actualCreditRefund; // update local var for next loop iteration
+              remainingBalance -= actualCreditRefund; // update local var for next loop iteration
               
               const lastLedger = db.prepare(`SELECT hmac_signature FROM customer_ledger WHERE customer_id = ? ORDER BY date DESC LIMIT 1`).get(tx.customer_id) as { hmac_signature: string } | undefined;
               const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
               const ledgerId = crypto.randomUUID();
               const entryData = { id: ledgerId, customer_id: tx.customer_id, date: new Date().toISOString(), type: 'CREDIT' as const, amount: actualCreditRefund, reference_id: transactionId, description: `Return on Txn ${transactionId.slice(0, 8)}` };
               const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
-              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature) VALUES (?, ?, datetime('now'), 'CREDIT', ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, actualCreditRefund, transactionId, entryData.description, signature);
+              db.prepare(`INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature) VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?)`).run(ledgerId, tx.customer_id, entryData.date, actualCreditRefund, transactionId, entryData.description, signature);
             }
           } else {
             glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: refundAmount });

@@ -4,7 +4,8 @@ import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
 import { InventoryItem, Supplier } from '@/types';
 import crypto from 'crypto';
-import { createBalancedJournalEntry } from './ledger';
+import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
+import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { getActiveUserId } from './auth';
 
 // Helper to check for MLEK
@@ -186,18 +187,23 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
     // 5. Update Supplier balance if Credit
     if (po.payment_method === 'Credit') {
       db.prepare("UPDATE suppliers SET current_balance = current_balance + ? WHERE id = ?").run(po.total_cost, po.supplier_id);
+      const lastLedger = db.prepare(`SELECT hmac_signature FROM supplier_ledger WHERE supplier_id = ? ORDER BY date DESC LIMIT 1`).get(po.supplier_id) as { hmac_signature: string } | undefined;
+      const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
+      const ledgerId = crypto.randomUUID();
+      const entryData = { id: ledgerId, supplier_id: po.supplier_id, date: new Date().toISOString(), type: 'CHARGE' as const, amount: po.total_cost, reference_id: purchaseOrderId, description: 'Goods Receipt (Credit)' };
+      const signature = calculateHMACSignature(entryData, prevSig, (global as any).mlekSecret);
+
       db.prepare(`
-        INSERT INTO supplier_ledger (id, supplier_id, date, type, amount, reference_id, description)
-        VALUES (?, ?, datetime('now'), 'CHARGE', ?, ?, 'Goods Receipt (Credit)')
-      `).run(crypto.randomUUID(), po.supplier_id, po.total_cost, purchaseOrderId);
+        INSERT INTO supplier_ledger (id, supplier_id, date, type, amount, reference_id, description, hmac_signature)
+        VALUES (?, ?, ?, 'CHARGE', ?, ?, 'Goods Receipt (Credit)', ?)
+      `).run(ledgerId, po.supplier_id, entryData.date, po.total_cost, purchaseOrderId, signature);
     }
 
     // 6. Record Bookkeeping Journal
     // Debit Inventory Asset (1210)
     // Credit Accounts Payable (2010) (if Credit) or Cash Drawer (1010) (if Cash)
     const creditAccount = po.payment_method === 'Credit' ? 'acc-ap' : 'acc-cash';
-    const insertGL = require('./ledger').createBalancedJournalEntry;
-    insertGL(
+    createBalancedJournalEntry(
       `Received goods for PO: ${purchaseOrderId}`,
       [
         { accountId: 'acc-inv', type: 'DEBIT', amount: po.total_cost },

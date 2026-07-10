@@ -5,6 +5,7 @@ import { encryptField, decryptField } from '@/lib/crypto';
 import { Customer, CustomerLedgerEntry } from '@/types';
 import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
+import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 
 // Helper to check for MLEK
 function getMlekSecret(): Buffer {
@@ -61,7 +62,7 @@ export async function deactivateCustomer(customerId: string): Promise<void> {
 // Retrieve customer ledger and check HMAC signature validity
 export async function getCustomerLedger(customerId: string): Promise<{ ledger: CustomerLedgerEntry[]; isIntegrityViolated: boolean }> {
   getMlekSecret(); // Ensure unlocked
-  const rows = db.prepare("SELECT * FROM customer_ledger WHERE customer_id = ? ORDER BY date ASC").all() as CustomerLedgerEntry[];
+  const rows = db.prepare("SELECT * FROM customer_ledger WHERE customer_id = ? ORDER BY date ASC").all(customerId) as CustomerLedgerEntry[];
 
   let prevSig = "GENESIS";
   let isIntegrityViolated = false;
@@ -108,14 +109,13 @@ export async function recordPayment(customerId: string, amount: number, descript
 
     db.prepare(`
       INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature)
-      VALUES (?, ?, datetime('now'), 'CREDIT', ?, NULL, ?, ?)
-    `).run(ledgerId, customerId, amount, description, signature);
+      VALUES (?, ?, ?, 'CREDIT', ?, NULL, ?, ?)
+    `).run(ledgerId, customerId, entryData.date, amount, description, signature);
 
     // 4. Record G/L Journal Entry
     // Debit Cash Drawer (1010) - Cash increases
     // Credit Accounts Receivable (1110) - Customer debt decreases
-    const insertGL = require('./ledger').createBalancedJournalEntry;
-    insertGL(
+    createBalancedJournalEntry(
       `Received payment from customer: ${customerId}`,
       [
         { accountId: 'acc-cash', type: 'DEBIT', amount },

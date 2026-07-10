@@ -9,5 +9,14 @@ vi.mock('@/lib/session', () => ({
   })
 }));
 
-// Provide a global MLEK secret for testing
-(global as any).mlekSecret = Buffer.from('00000000000000000000000000000000');
+// Provide a global MLEK secret for testing using a securely generated random key
+import crypto from 'crypto';
+(global as any).mlekSecret = crypto.randomBytes(32);
+
+import { beforeAll } from 'vitest';
+import db, { runMigrations } from '@/lib/db';
+
+beforeAll(async () => {
+  // Initialize the in-memory database with migrations
+  await runMigrations((global as any).mlekSecret.toString('hex'));
+});

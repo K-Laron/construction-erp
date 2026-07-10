@@ -31,7 +31,7 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
         const shift = await getCurrentShift(cashierId);
         if (shift) {
           setCurrentShiftId(shift.id);
-          setOpenTime(shift.start_time);
+          setOpenTime(shift.opened_at);
           onShiftChange(shift.id);
         }
       } catch (err: any) {
