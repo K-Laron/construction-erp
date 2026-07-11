@@ -6,7 +6,7 @@ import { ShieldCheck, ShieldAlert, Key, Download, Plus, Loader2, RefreshCw, Sear
 import { getUsers, createUser } from '@/app/actions/auth';
 import { exportEncryptedBackup, getBackupLogs } from '@/app/actions/backup';
 import { runDailyGLScan } from '@/app/actions/ledger';
-import { getCustomers, getCustomerLedger } from '@/app/actions/customers';
+import { verifyAllCustomersIntegrity } from '@/app/actions/customers';
 import { formatCurrency, formatQuantity } from '@/lib/format';
 import { toast } from 'sonner';
 
@@ -111,26 +111,16 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
     setScanResult(null);
     try {
       const glScan = await runDailyGLScan();
-      const customers = await getCustomers();
-      let customerTampered = false;
-      const tamperedList: string[] = [];
+      const customerScan = await verifyAllCustomersIntegrity();
 
-      for (const cust of customers) {
-        const { isIntegrityViolated } = await getCustomerLedger(cust.id);
-        if (isIntegrityViolated) {
-          customerTampered = true;
-          tamperedList.push(cust.name);
-        }
-      }
-
-      if (glScan.isCorrupt || customerTampered) {
+      if (glScan.isCorrupt || customerScan.isCorrupt) {
         setScanResult('violated');
         let details = '';
         if (glScan.isCorrupt) {
           details += `General Ledger Trial Balance discrepancy found in journal entries: ${glScan.corruptEntries.join(', ')}. `;
         }
-        if (customerTampered) {
-          details += `HMAC signature mismatch in customer ledger chains for: ${tamperedList.join(', ')}.`;
+        if (customerScan.isCorrupt) {
+          details += `HMAC signature mismatch in customer ledger chains for: ${customerScan.tamperedList.join(', ')}.`;
         }
         setIntegrityDetails(details);
       } else {

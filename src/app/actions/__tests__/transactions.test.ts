@@ -195,4 +195,297 @@ describe('Transaction Server Actions', () => {
     const cust2 = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };
     expect(cust2.current_balance).toBe(0);
   });
+
+  it('rejects credit checkout without a customer ID (C2)', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test C2 Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test C2 Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 0,
+      paymentMethod: 'Credit' as const
+    };
+
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('CREDIT_CUSTOMER_REQUIRED');
+  });
+
+  it('calculates tax including delivery fee under Option A', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Tax Item', 'Tools', 'pc', 10000, 5000, 11200, 11200, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test Tax Item', quantity: 1000, unitUsed: 'pc', unitPrice: 11200, unitCost: 5000, totalPrice: 11200 }
+      ],
+      subtotal: 11200,
+      tax: 1320, // 12% on (11200 subtotal + 1120 deliveryFee) = 12320 total. 12320 / 1.12 * 0.12 = 1320.
+      deliveryFee: 1120,
+      discount: 0,
+      totalAmount: 12320,
+      amountPaid: 12320,
+      paymentMethod: 'Cash' as const
+    };
+
+    const res = await processCheckout(payload);
+    if (!res.success) {
+      console.log("CHECKOUT ERROR DETAIL:", res.error);
+    }
+    expect(res.success).toBe(true);
+  });
+
+  function sumAccount(accountId: string, type: 'DEBIT' | 'CREDIT') {
+    return (db.prepare(
+      `SELECT COALESCE(SUM(amount),0) as total FROM journal_lines WHERE account_id = ? AND type = ?`
+    ).get(accountId, type) as { total: number }).total;
+  }
+
+  it('Credit with down payment posts Cash + AR debits and revenue credit', async () => {
+    db.prepare('DELETE FROM journal_lines').run();
+    db.prepare('DELETE FROM journal_entries').run();
+
+    const customerId = crypto.randomUUID();
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at) VALUES (?, 'Credit DP Cust', 10000, 0, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Credit DP Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Credit DP Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 400,
+      paymentMethod: 'Credit' as const
+    };
+
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(true);
+
+    expect(sumAccount('acc-cash', 'DEBIT')).toBe(400);
+    expect(sumAccount('acc-ar', 'DEBIT')).toBe(600);
+    expect(sumAccount('acc-revenue', 'CREDIT')).toBe(1000);
+
+    const jeCount = db.prepare('SELECT COUNT(*) as cnt FROM journal_entries').get() as { cnt: number };
+    expect(jeCount.cnt).toBeGreaterThanOrEqual(1);
+
+    const cust = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };
+    expect(cust.current_balance).toBe(600);
+  });
+
+  it('Check full payment posts Cash debit and journal entry', async () => {
+    db.prepare('DELETE FROM journal_lines').run();
+    db.prepare('DELETE FROM journal_entries').run();
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Check Full Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Check Full Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 1000,
+      paymentMethod: 'Check' as const
+    };
+
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(true);
+
+    // Server recalculates tax: (1000 / 1.12) * 0.12 = 107
+    expect(sumAccount('acc-cash', 'DEBIT')).toBe(1000);
+    expect(sumAccount('acc-revenue', 'CREDIT')).toBe(893);
+    expect(sumAccount('acc-vat-payable', 'CREDIT')).toBe(107);
+
+    const jeCount = db.prepare('SELECT COUNT(*) as cnt FROM journal_entries').get() as { cnt: number };
+    expect(jeCount.cnt).toBeGreaterThanOrEqual(1);
+  });
+
+  it('rejects overpayment', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Overpay Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Overpay Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 1001,
+      paymentMethod: 'Cash' as const
+    };
+
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/OVERPAYMENT/);
+  });
+
+  it('rejects partial cash without customer (CUSTOMER_REQUIRED_FOR_BALANCE)', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Partial No Cust', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Partial No Cust', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 400,
+      paymentMethod: 'Cash' as const
+    };
+
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/CUSTOMER_REQUIRED_FOR_BALANCE/);
+  });
+
+  it('applies return refunds to customer outstanding balance first (M5)', async () => {
+    const customerId = crypto.randomUUID();
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'M5 Customer', 10000, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test M5 Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    // 1. Create a credit transaction for 5000 (customer balance becomes 5000)
+    const creditPayload = {
+      customerId,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test M5 Item', quantity: 5000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 5000 }
+      ],
+      subtotal: 5000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 5000,
+      amountPaid: 0,
+      paymentMethod: 'Credit' as const
+    };
+    const { data: { transactionId: creditTxId } } = (await processCheckout(creditPayload)) as { data: { transactionId: string } };
+
+    // 2. Create a cash transaction for 1000 (balance_due = 0)
+    const cashPayload = {
+      customerId,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Test M5 Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 1000,
+      paymentMethod: 'Cash' as const
+    };
+    const { data: { transactionId: cashTxId } } = (await processCheckout(cashPayload)) as { data: { transactionId: string } };
+
+    // 3. Process return of cash transaction. Since customer has outstanding balance (5000), it should reduce it by 1000 and NOT refund cash.
+    const beforeCash = db.prepare("SELECT balance FROM accounts WHERE id = 'acc-cash'").get() as { balance: number };
+    
+    await processReturn(cashTxId, [
+      { itemId, quantity: 1000 }
+    ]);
+
+    // Customer balance should be 4000 (reduced by 1000)
+    const cust = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };
+    expect(cust.current_balance).toBe(4000);
+
+    // The credit transaction's balance_due should be 4000 (reduced by 1000)
+    const creditTx = db.prepare("SELECT balance_due FROM transactions WHERE id = ?").get(creditTxId) as { balance_due: number };
+    expect(creditTx.balance_due).toBe(4000);
+
+    // Cash account balance should NOT change (0 cash refund)
+    const afterCash = db.prepare("SELECT balance FROM accounts WHERE id = 'acc-cash'").get() as { balance: number };
+    expect(afterCash.balance).toBe(beforeCash.balance);
+  });
+
+  it('rejects checkout when stock insufficient', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active)
+      VALUES (?, 'Low Stock Item', 'Tools', 'pc', 500, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Low Stock Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 1000,
+      paymentMethod: 'Cash' as const
+    };
+
+    const res = await processCheckout(payload);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/INSUFFICIENT_STOCK/);
+  });
+
+  it('rejects checkout when stock drops to exactly zero (concurrent guard)', async () => {
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active)
+      VALUES (?, 'Exact Stock Item', 'Tools', 'pc', 1000, 500, 1000, 1000, 1)`).run(itemId);
+
+    const payload = {
+      customerId: null,
+      cashierId: 'system-daemon',
+      items: [
+        { itemId, name: 'Exact Stock Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }
+      ],
+      subtotal: 1000,
+      tax: 0,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 1000,
+      amountPaid: 1000,
+      paymentMethod: 'Cash' as const
+    };
+
+    // First should succeed
+    const res1 = await processCheckout(payload);
+    expect(res1.success).toBe(true);
+
+    // Second should fail (stock now 0)
+    const res2 = await processCheckout(payload);
+    expect(res2.success).toBe(false);
+    expect(res2.error).toMatch(/INSUFFICIENT_STOCK/);
+  });
 });

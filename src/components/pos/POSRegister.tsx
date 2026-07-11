@@ -101,9 +101,9 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
   const discount = discountStr ? Math.round(parseFloat(discountStr) * 100) : 0;
   const deliveryFee = deliveryFeeStr ? Math.round(parseFloat(deliveryFeeStr) * 100) : 0;
   
-  // Tax calculation (12% VAT is included in subtotal if toggled)
-  // VAT = Vatable Sales * 12% -> Extract VAT from inclusive subtotal
-  const tax = taxEnabled ? Math.round(((subtotal - discount) / 1.12) * 0.12) : 0;
+  // Tax calculation (12% VAT is included in subtotal and deliveryFee if toggled)
+  // VAT = Vatable Sales * 12% -> Extract VAT from inclusive subtotal + deliveryFee
+  const tax = taxEnabled ? Math.round(((subtotal - discount + deliveryFee) / 1.12) * 0.12) : 0;
   const totalAmount = Math.max(0, subtotal - discount + deliveryFee);
 
   const getCategoryColor = (cat: string) => {

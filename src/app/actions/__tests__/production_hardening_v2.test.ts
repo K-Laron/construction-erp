@@ -4,7 +4,7 @@ import db, { runMigrations } from '@/lib/db';
 import { getMlekSecret, setMlekSecret, checkMlek } from '@/lib/mlek';
 import { processCheckout } from '../transactions';
 import { bootstrapStore } from '../unlock';
-import { validateAndRestoreBackup } from '../backup';
+import { validateAndRestoreBackup, exportEncryptedBackup } from '../backup';
 
 describe('Production Hardening Phase 5 Tests', () => {
   const testSecret = crypto.randomBytes(32);
@@ -126,6 +126,94 @@ describe('Production Hardening Phase 5 Tests', () => {
       const badPayload = Buffer.from("corruptedpayload").toString('base64');
       const res = await validateAndRestoreBackup(badPayload, 'test-user');
       expect(res.success).toBe(false);
+    });
+
+    it('successfully exports and restores backup with active dbProxy (H1)', async () => {
+      // 1. Export backup
+      const exportRes = await exportEncryptedBackup();
+      expect(exportRes.success).toBe(true);
+      expect(exportRes.data).toBeDefined();
+
+      // 2. Restore backup
+      const restoreRes = await validateAndRestoreBackup(exportRes.data!, 'system-daemon');
+      if (!restoreRes.success) {
+        console.log("RESTORE ERROR DETAIL:", restoreRes.error);
+      }
+      expect(restoreRes.success).toBe(true);
+
+      // 3. Verify database connection is still active and working (not closed error)
+      const row = db.prepare("SELECT 1 as val").get() as { val: number };
+      expect(row.val).toBe(1);
+    });
+  });
+
+  describe('4. Supplier Ledger HMAC Repair Migration (C1 & Migration 7)', () => {
+    it('successfully repairs buggy supplier ledger HMAC signatures', async () => {
+      const supplierId = crypto.randomUUID();
+      db.prepare(`INSERT INTO suppliers (id, name, contact_person, phone, email, current_balance, is_active) VALUES (?, 'Repair Supplier', null, null, null, 1000, 1)`).run(supplierId);
+
+      const entryId = crypto.randomUUID();
+      const dateStr = new Date().toISOString();
+      const prevSig = "GENESIS";
+      
+      // Calculate buggy signature (using '' instead of supplierId)
+      const buggyData = `${entryId}-${''}-${1000}-CHARGE-${dateStr}-ref1-desc1--${prevSig}`;
+      const buggySig = crypto.createHmac('sha256', testSecret).update(buggyData).digest('hex');
+
+      db.prepare(`
+        INSERT INTO supplier_ledger (id, supplier_id, date, type, amount, reference_id, description, hmac_signature)
+        VALUES (?, ?, ?, 'CHARGE', ?, 'ref1', 'desc1', ?)
+      `).run(entryId, supplierId, dateStr, 1000, buggySig);
+
+      // Verify it is currently failing integrity check (before repair migration 7 is run)
+      const { getSupplierLedger } = await import('../inventory');
+      const verifyBefore = await getSupplierLedger(supplierId);
+      expect(verifyBefore.isIntegrityViolated).toBe(true);
+
+      // Programmatically run migration 007 (by calling runMigrations again)
+      // Delete version 7 first so the runner executes it on our new test row
+      db.prepare("DELETE FROM schema_migrations WHERE version = 7").run();
+      await runMigrations(testSecret.toString('hex'));
+
+      // Verify it is now valid (integrity violation resolved)
+      const verifyAfter = await getSupplierLedger(supplierId);
+      expect(verifyAfter.isIntegrityViolated).toBe(false);
+      expect(verifyAfter.ledger[0].hmac_signature).not.toBe(buggySig);
+    });
+  });
+
+  describe('5. Timestamp Standardization Migration (N4 & Migration 8)', () => {
+    it('standardizes mixed date formats to ISO-8601 and maintains correct chronological sorting', async () => {
+      const tx1Id = crypto.randomUUID();
+      const tx2Id = crypto.randomUUID();
+      
+      // Insert old format that is chronologically later: 12:00
+      db.prepare(`
+        INSERT INTO transactions (id, cashier_id, date, subtotal, tax, total_amount, amount_paid, balance_due, payment_status, payment_method, delivery_status)
+        VALUES (?, 'system-daemon', '2026-07-11 12:00:00', 1000, 0, 1000, 1000, 0, 'Paid', 'Cash', 'N/A')
+      `).run(tx1Id);
+
+      // Insert new format that is chronologically earlier: 10:00
+      db.prepare(`
+        INSERT INTO transactions (id, cashier_id, date, subtotal, tax, total_amount, amount_paid, balance_due, payment_status, payment_method, delivery_status)
+        VALUES (?, 'system-daemon', '2026-07-11T10:00:00.000Z', 1000, 0, 1000, 1000, 0, 'Paid', 'Cash', 'N/A')
+      `).run(tx2Id);
+
+      // Verify lexicographical order before migration (incorrect sorting due to space vs 'T')
+      const beforeSort = db.prepare("SELECT id FROM transactions WHERE id IN (?, ?) ORDER BY date ASC").all(tx1Id, tx2Id) as { id: string }[];
+      expect(beforeSort[0].id).toBe(tx1Id);
+
+      // Run migration 8
+      db.prepare("DELETE FROM schema_migrations WHERE version = 8").run();
+      await runMigrations(testSecret.toString('hex'));
+
+      // Verify format updated to ISO-8601
+      const tx1After = db.prepare("SELECT date FROM transactions WHERE id = ?").get(tx1Id) as { date: string };
+      expect(tx1After.date).toBe('2026-07-11T12:00:00.000Z');
+
+      // Verify correct sorting now
+      const afterSort = db.prepare("SELECT id FROM transactions WHERE id IN (?, ?) ORDER BY date ASC").all(tx1Id, tx2Id) as { id: string }[];
+      expect(afterSort[0].id).toBe(tx2Id);
     });
   });
 });

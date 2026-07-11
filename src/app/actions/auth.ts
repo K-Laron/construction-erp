@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { getSession } from '@/lib/session';
 import { checkMlek } from "@/lib/mlek";
 import { z } from 'zod';
-import { headers } from 'next/headers';
+import { resolveClientIp } from '@/lib/client_ip';
 
 const CreateUserSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters long"),
@@ -30,26 +30,35 @@ export async function getActiveUserId(): Promise<string> {
   return session.userId;
 }
 
-export async function checkManagerRole(): Promise<string> {
+export async function requireAuth(allowedRoles?: ('Cashier' | 'Manager' | 'Admin')[]): Promise<string> {
   const userId = await getActiveUserId();
-  const user = db.prepare("SELECT role FROM users WHERE id = ? AND is_active = 1").get(userId) as { role: string } | undefined;
-  if (!user || (user.role !== 'Manager' && user.role !== 'Admin')) {
-    throw new Error("RBAC_DENIED: This action requires Manager or Admin privileges.");
+  const user = db.prepare("SELECT role, is_active FROM users WHERE id = ?").get(userId) as { role: string; is_active: number } | undefined;
+  if (!user || user.is_active !== 1) {
+    throw new Error("UNAUTHORIZED: User account is inactive or not found.");
+  }
+  if (allowedRoles && !allowedRoles.includes(user.role as any)) {
+    throw new Error("RBAC_DENIED: This action requires higher privileges.");
   }
   return userId;
 }
 
-// Authenticate user via PIN
-export async function authenticateUser(username: string, pin: string, providedIp?: string): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
-  let ipAddress = providedIp;
-  if (!ipAddress) {
-    try {
-      const h = await headers();
-      ipAddress = h.get('x-forwarded-for') || '127.0.0.1';
-    } catch {
-      ipAddress = '127.0.0.1';
-    }
+export async function checkManagerRole(): Promise<string> {
+  return requireAuth(['Manager', 'Admin']);
+}
+
+export async function logoutUser(): Promise<{ success: boolean }> {
+  try {
+    const session = await getSession();
+    session.destroy();
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false };
   }
+}
+
+// Authenticate user via PIN
+export async function authenticateUser(username: string, pin: string): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
+  const ipAddress = await resolveClientIp();
 
   const timeframe5Min = Date.now() - 300000;
   const timeframe15Min = Date.now() - 900000;
@@ -149,8 +158,9 @@ export async function createUser(
   }
 }
 
-// Get all active users
+// Get all active users (any authenticated role — POS manager-override dropdown needs the list)
 export async function getUsers(): Promise<{ id: string; username: string; name: string; role: string; is_active: number }[]> {
+  await requireAuth();
   return db.prepare("SELECT id, username, name, role, is_active FROM users WHERE is_system = 0 ORDER BY name ASC").all() as { id: string; username: string; name: string; role: string; is_active: number; }[];
 }
 

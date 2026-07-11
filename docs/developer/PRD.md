@@ -25,8 +25,8 @@ To support multi-device operations on a local area network (LAN) safely without 
   ```
 - **Single DB Worker Pattern**: No client devices touch the SQLite file directly over network shares. All interactions are routed as HTTP requests to Next.js Server Actions on the host computer.
 - **IP Detection & Proxy Configuration (Default-Deny)**:
-  - **Default-Deny Rule**: By default, the Next.js server resolves client IP addresses using `req.socket.remoteAddress` only. All client-supplied `X-Forwarded-For` headers are strictly ignored.
-  - **Trusted Proxy Switch**: Next.js will *only* parse the `X-Forwarded-For` header if the Administrator has explicitly enabled "Reverse Proxy Mode" in `system_config` and registered a specific trusted proxy CIDR range.
+   - **Default-Deny Rule**: By default, the Next.js server resolves client IP addresses to `127.0.0.1` via `resolveClientIp()`. No client-supplied IP argument is ever accepted by server actions.
+   - **Trusted Proxy Switch**: The shared `src/lib/client_ip.ts` helper checks `TRUST_PROXY=true` env var. When enabled, the first hop of `X-Forwarded-For` is used for rate-limiting. When disabled (default LAN mode), all clients resolve to `127.0.0.1`.
 
 ### SQLite Concurrency & Event Loop Management
 - **WAL Concurrency Tuning**: SQLite is initialized in Write-Ahead Logging (WAL) mode with a busy timeout buffer to handle concurrent writes:
@@ -143,6 +143,13 @@ To conform with standard tax regulations, the system splits transaction document
 ### C. G/L Double-Entry Balance Verification Scanner
 A daily background health checker groups all G/L `journal_lines` by transaction and asserts that the sum of Debits minus Credits is exactly `0`, raising an admin alert if a bug causes discrepancy.
 
+As of Phase 17 hardening, processCheckout uses a **fail-closed G/L posting** model: every successful sale with totalAmount > 0 must post a balanced journal entry. If totalDebits !== totalCredits or totalDebits === 0, the transaction throws GL_UNBALANCED and the entire checkout rolls back. The unified debit matrix is:
+- DEBIT acc-cash (amountPaid > 0)
+- DEBIT acc-ar (balanceDue > 0)
+- CREDIT acc-revenue (totalAmount - tax)
+- CREDIT acc-vat-payable (tax > 0)
+- COGS: DEBIT acc-cost-of-sales / CREDIT acc-inv (costOfGoods > 0)
+
 ### D. Role-Based Access Control (RBAC) Authorization Matrix
 To protect accounting entries, inventory adjustments, and payroll metrics, the system implements three rigid roles:
 
@@ -182,7 +189,7 @@ When a check bounces, the customer's ledger balance and the G/L adjust in lockst
 
 ### H. Shift Close Z-Reading (EOD Compliance Report)
 To ensure correct tax tracking, the cashier shift drawer reconciliation (Phase 14) generates a formal **Z-Reading Report** upon shift closure:
-- **Report Ledger**: Computes total gross sales (separated into Vatable Sales, VAT-Exempt Sales, Zero-Rated Sales), total collected VAT tax (12%), total voided invoices, total sales returns, and cash discrepancies.
+- **Report Ledger**: Computes total gross sales (separated into Vatable Sales, VAT-Exempt Sales, Zero-Rated Sales), total collected VAT tax (12%), total voided invoices, total sales returns, and cash discrepancies. Vatable sales include delivery_fee in the tax base: `vatable_sales = (subtotal - discount + delivery_fee) - tax` (VAT Option A: delivery fee is vatable).
 - **Tally Verification Boundaries**: Only checkouts with `payment_method = 'Cash'` increment the `shifts.expected_cash` totals. Transactions processed under ledger credit accounts or checks (PDCs) bypass the physical cash drawer expected count.
 - **Output**: Generates a structured A6 portrait printout (1/4 A4 size), saves a static snapshot in the database, and locks the shift history from future modification.
 

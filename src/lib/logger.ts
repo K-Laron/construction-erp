@@ -28,6 +28,8 @@ async function log(level: LogLevel, message: string, ...args: unknown[]): Promis
       console.error(JSON.stringify(payload));
     } else if (level === 'warn') {
       console.warn(JSON.stringify(payload));
+    } else if (level === 'info') {
+      console.log(JSON.stringify(payload));
     }
   } else {
     const tracePrefix = traceId ? ` [Trace: ${traceId}]` : '';

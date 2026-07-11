@@ -6,7 +6,7 @@ import { InventoryItem, Supplier, SupplierLedgerEntry } from '@/types';
 import crypto from 'crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
-import { getActiveUserId } from './auth';
+import { getActiveUserId, requireAuth } from './auth';
 import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
 
@@ -30,6 +30,7 @@ const CreateSupplierSchema = z.object({
 
 // Fetch active inventory (values in millicounts/centavos)
 export async function getInventory(): Promise<InventoryItem[]> {
+  await requireAuth();
   getMlekSecret(false); // Ensure unlocked
   return db.prepare("SELECT * FROM inventory WHERE is_active = 1 ORDER BY name ASC").all() as InventoryItem[];
 }
@@ -56,6 +57,7 @@ export async function createProduct(
       wholesalePriceCentavos,
       reorderLevelMillicounts
     });
+    await requireAuth(['Manager', 'Admin']);
     getMlekSecret(); // Ensure unlocked
     const id = crypto.randomUUID();
 
@@ -88,6 +90,7 @@ const DeactivateProductSchema = z.object({
 export async function deactivateProduct(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const parsed = DeactivateProductSchema.parse({ id });
+    await requireAuth(['Manager', 'Admin']);
     getMlekSecret(); // Ensure unlocked
     const info = db.prepare("UPDATE inventory SET is_active = 0 WHERE id = ?").run(parsed.id);
     if (info.changes === 0) throw new Error("Product not found");
@@ -100,6 +103,7 @@ export async function deactivateProduct(id: string): Promise<{ success: boolean;
 // Fetch active suppliers
 export async function getSuppliers(): Promise<Supplier[]> {
   const secret = getMlekSecret(false);
+  await requireAuth();
   const rows = db.prepare("SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC").all() as { id: string, name: string, contact_person: string | null, phone: string | null, email: string | null, current_balance: number, is_active: number }[];
 
   return rows.map(r => ({
@@ -133,6 +137,7 @@ export async function createSupplier(
   try {
     const parsed = CreateSupplierSchema.parse({ name, contactPerson, phone, email });
     const secret = getMlekSecret();
+    await requireAuth(['Manager', 'Admin']);
     const id = crypto.randomUUID();
 
     const encryptedPhone = parsed.phone ? encryptField(parsed.phone, secret) : null;
@@ -153,6 +158,7 @@ export async function createSupplier(
 export async function deactivateSupplier(id: string): Promise<{ success: boolean; error?: string }> {
   try {
     const parsed = DeactivateSupplierSchema.parse({ id });
+    await requireAuth(['Manager', 'Admin']);
     getMlekSecret();
     const info = db.prepare("UPDATE suppliers SET is_active = 0 WHERE id = ?").run(parsed.id);
     if (info.changes === 0) throw new Error("Supplier not found");
@@ -170,6 +176,7 @@ export async function createPurchaseOrder(
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
     const parsed = CreatePurchaseOrderSchema.parse({ supplierId, paymentMethod, items });
+    await requireAuth(['Manager', 'Admin']);
     getMlekSecret();
     const poId = crypto.randomUUID();
 
@@ -179,8 +186,8 @@ export async function createPurchaseOrder(
     db.transaction(() => {
       db.prepare(`
         INSERT INTO purchase_orders (id, supplier_id, date, total_cost, payment_method, status)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, 'Draft')
-      `).run(poId, parsed.supplierId, roundedTotalCost, parsed.paymentMethod);
+        VALUES (?, ?, ?, ?, ?, 'Draft')
+      `).run(poId, parsed.supplierId, new Date().toISOString(), roundedTotalCost, parsed.paymentMethod);
 
       const insertItem = db.prepare(`
         INSERT INTO purchase_order_items (id, purchase_order_id, item_id, quantity, unit_price, total_cost)
@@ -208,25 +215,48 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
   try {
     const parsed = ReceiveGoodsSchema.parse({ purchaseOrderId });
     getMlekSecret();
-    const receivedBy = await getActiveUserId();
+    const receivedBy = await requireAuth(['Manager', 'Admin']);
     const receiptId = crypto.randomUUID();
 
     db.transaction(() => {
-      // 1. Mark PO as Received
-      db.prepare("UPDATE purchase_orders SET status = 'Received' WHERE id = ?").run(parsed.purchaseOrderId);
+      // 0. Status pre-check with atomic conditional update
+      const poRow = db.prepare(
+        "SELECT status, supplier_id, total_cost, payment_method FROM purchase_orders WHERE id = ?"
+      ).get(parsed.purchaseOrderId) as {
+        status: string;
+        supplier_id: string;
+        total_cost: number;
+        payment_method: 'Cash' | 'Credit';
+      } | undefined;
+
+      if (!poRow) {
+        throw new Error('PO_NOT_FOUND: Purchase order does not exist.');
+      }
+      if (poRow.status === 'Received') {
+        throw new Error('ALREADY_RECEIVED: This purchase order was already received.');
+      }
+      if (poRow.status === 'Cancelled') {
+        throw new Error('PO_CANCELLED: Cannot receive a cancelled purchase order.');
+      }
+      if (poRow.status !== 'Draft' && poRow.status !== 'Sent') {
+        throw new Error(`INVALID_PO_STATUS: Cannot receive PO in status ${poRow.status}.`);
+      }
+
+      const upd = db.prepare(
+        "UPDATE purchase_orders SET status = 'Received' WHERE id = ? AND status IN ('Draft', 'Sent')"
+      ).run(parsed.purchaseOrderId);
+      if (upd.changes === 0) {
+        throw new Error('ALREADY_RECEIVED: Concurrent receive or invalid status.');
+      }
 
       // 2. Log goods receipt
       db.prepare(`
         INSERT INTO goods_receipts (id, purchase_order_id, date, received_by)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-      `).run(receiptId, parsed.purchaseOrderId, receivedBy);
+        VALUES (?, ?, ?, ?)
+      `).run(receiptId, parsed.purchaseOrderId, new Date().toISOString(), receivedBy);
 
-      // 3. Fetch PO details
-      const po = db.prepare("SELECT supplier_id, total_cost, payment_method FROM purchase_orders WHERE id = ?").get(parsed.purchaseOrderId) as {
-        supplier_id: string;
-        total_cost: number;
-        payment_method: 'Cash' | 'Credit';
-      };
+      // 3. Use poRow for PO details
+      const po = { supplier_id: poRow.supplier_id, total_cost: poRow.total_cost, payment_method: poRow.payment_method };
 
       const poItems = db.prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id = ?").all(parsed.purchaseOrderId) as { id: string, purchase_order_id: string, item_id: string, quantity: number, unit_price: number, total_price: number }[];
 
@@ -259,8 +289,8 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
         // L5: Stock audit trail (direction IN)
         db.prepare(`
           INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-          VALUES (?, CURRENT_TIMESTAMP, ?, 'STOCK_IN', ?, ?, ?)
-        `).run(crypto.randomUUID(), receivedBy, item.item_id, current.stock_quantity.toString(), newQty.toString());
+          VALUES (?, ?, ?, 'STOCK_IN', ?, ?, ?)
+        `).run(crypto.randomUUID(), new Date().toISOString(), receivedBy, item.item_id, current.stock_quantity.toString(), newQty.toString());
       }
 
       // 5. Update Supplier balance if Credit
@@ -300,6 +330,7 @@ export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: 
 
 // Retrieve supplier ledger and check HMAC signature validity
 export async function getSupplierLedger(supplierId: string): Promise<{ ledger: SupplierLedgerEntry[]; isIntegrityViolated: boolean }> {
+  await requireAuth();
   getMlekSecret(false); // Ensure unlocked
   const rows = db.prepare("SELECT * FROM supplier_ledger WHERE supplier_id = ? ORDER BY date ASC").all(supplierId) as SupplierLedgerEntry[];
 
@@ -315,4 +346,80 @@ export async function getSupplierLedger(supplierId: string): Promise<{ ledger: S
   }
 
   return { ledger: rows, isIntegrityViolated };
+}
+
+const RecordSupplierPaymentSchema = z.object({
+  supplierId: z.string().uuid(),
+  amount: z.number().int().positive(),
+  description: z.string().min(1)
+});
+
+export async function recordSupplierPayment(
+  supplierId: string,
+  amount: number,
+  description: string
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    const cashierId = await requireAuth(['Manager', 'Admin']);
+    const parsed = RecordSupplierPaymentSchema.parse({ supplierId, amount, description });
+    getMlekSecret(); // Ensure unlocked
+    const ledgerId = crypto.randomUUID();
+
+    db.transaction(() => {
+      // 0. Validate payment does not exceed outstanding balance
+      const sup = db.prepare("SELECT current_balance FROM suppliers WHERE id = ?").get(parsed.supplierId) as { current_balance: number } | undefined;
+      if (!sup) {
+        throw new Error('SUPPLIER_NOT_FOUND: Supplier does not exist.');
+      }
+      if (parsed.amount > sup.current_balance) {
+        throw new Error('OVERPAYMENT_NOT_ALLOWED: Payment exceeds supplier outstanding balance.');
+      }
+
+      // 1. Update supplier current balance (decrease outstanding Accounts Payable)
+      db.prepare(`
+        UPDATE suppliers SET current_balance = current_balance - ? WHERE id = ?
+      `).run(parsed.amount, parsed.supplierId);
+
+      // 2. Fetch previous ledger entry's signature for chaining
+      const lastEntry = db.prepare(`
+        SELECT hmac_signature FROM supplier_ledger 
+        WHERE supplier_id = ? ORDER BY date DESC LIMIT 1
+      `).get(parsed.supplierId) as { hmac_signature: string } | undefined;
+      const prevSig = lastEntry ? lastEntry.hmac_signature : "GENESIS";
+
+      const entryData = {
+        id: ledgerId,
+        supplier_id: parsed.supplierId,
+        date: new Date().toISOString(),
+        type: 'PAYMENT' as const,
+        amount: parsed.amount,
+        reference_id: null,
+        description: parsed.description
+      };
+
+      const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
+
+      // 3. Write supplier ledger entry
+      db.prepare(`
+        INSERT INTO supplier_ledger (id, supplier_id, date, type, amount, reference_id, description, hmac_signature)
+        VALUES (?, ?, ?, 'PAYMENT', ?, NULL, ?, ?)
+      `).run(ledgerId, parsed.supplierId, entryData.date, parsed.amount, parsed.description, signature);
+
+      // 4. Record G/L Journal Entry
+      // Debit Accounts Payable (2010) - Liability decreases
+      // Credit Cash Drawer (1010) - Cash decreases
+      createBalancedJournalEntry(
+        `Recorded payment to supplier: ${parsed.supplierId}`,
+        [
+          { accountId: 'acc-ap', type: 'DEBIT', amount: parsed.amount },
+          { accountId: 'acc-cash', type: 'CREDIT', amount: parsed.amount }
+        ],
+        cashierId
+      );
+    })();
+
+    return { success: true, data: ledgerId };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to record supplier payment' };
+  }
 }

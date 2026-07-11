@@ -59,7 +59,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && document.getElementById('pin-input')?.focus()}
+                onKeyDown={e => e.key === 'Enter' && document.getElementById('login-pin')?.focus()}
                 placeholder="Enter username..."
                 autoFocus
                 className="w-full pl-12 pr-4 py-3.5 bg-surface-950 border border-surface-800 rounded-xl text-interactive-600 placeholder-slate-400 focus-ring focus:ring-accent-500/40 focus:border-accent-500 transition-smooth"

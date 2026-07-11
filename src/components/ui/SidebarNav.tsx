@@ -18,6 +18,7 @@ import { lockStoreAction } from "@/app/actions/store";
 interface SidebarNavProps {
   activeView: string;
   onNavigate: (view: string) => void;
+  currentUser?: { role?: string } | null;
 }
 
 const navItems = [
@@ -29,8 +30,9 @@ const navItems = [
   { id: "maintenance", label: "Maintenance", icon: Settings },
 ] as const;
 
-export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) {
+export default function SidebarNav({ activeView, onNavigate, currentUser }: SidebarNavProps) {
   const [expanded, setExpanded] = useState(false);
+  const canLockStore = currentUser?.role === 'Manager' || currentUser?.role === 'Admin';
 
   return (
     <nav
@@ -111,12 +113,17 @@ export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) 
         })}
       </div>
 
-      {/* ── Lock store button ────────────────────────── */}
+      {/* ── Lock store button (Manager/Admin only) ──── */}
+      {canLockStore && (
       <div className="shrink-0 border-t border-surface-800 p-2">
         <button
           onClick={async () => {
-            await lockStoreAction();
-            window.location.reload();
+            try {
+              await lockStoreAction();
+              window.location.reload();
+            } catch {
+              // RBAC/unauth — stay on page
+            }
           }}
           title={!expanded ? "Lock Store" : undefined}
           className={twMerge(
@@ -142,6 +149,7 @@ export default function SidebarNav({ activeView, onNavigate }: SidebarNavProps) 
           </span>
         </button>
       </div>
+      )}
     </nav>
   );
 }

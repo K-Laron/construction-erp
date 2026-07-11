@@ -2,8 +2,11 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import crypto from 'crypto';
 import db from '@/lib/db';
 import { getSession } from '@/lib/session';
-import { createUser, authenticateUser, checkManagerRole } from '../auth';
+import { createUser, authenticateUser, checkManagerRole, getUsers } from '../auth';
 import { processCheckout } from '../transactions';
+import { openShift, closeShift } from '../shifts';
+import { lockStoreAction } from '../store';
+import { isMlekUnlocked, setMlekSecret } from '@/lib/mlek';
 
 describe('RBAC Enforcement', () => {
   const cashierId = crypto.randomUUID();
@@ -59,7 +62,7 @@ describe('RBAC Enforcement', () => {
     vi.mocked(getSession).mockResolvedValueOnce({ userId: viewerId, role: 'Viewer', save: vi.fn() } as any);
     const res = await createUser(viewerId, 'shouldfail2', 'Should Fail 2', 'Cashier', '123456');
     expect(res.success).toBe(false);
-    expect(res.error).toContain('RBAC_DENIED');
+    expect(res.error).toContain('UNAUTHORIZED');
   });
 
   it('correctly authenticates a Cashier user', async () => {
@@ -82,6 +85,37 @@ describe('RBAC Enforcement', () => {
     vi.mocked(getSession).mockResolvedValueOnce({ userId: managerId, role: 'Manager', save: vi.fn() } as any);
     const result = await checkManagerRole();
     expect(result).toBe(managerId);
+  });
+
+  it('getUsers without session throws UNAUTHORIZED', async () => {
+    vi.mocked(getSession).mockResolvedValueOnce({ save: vi.fn() } as any);
+    await expect(getUsers()).rejects.toThrow(/UNAUTHORIZED/);
+  });
+
+  it('getUsers with cashier session succeeds', async () => {
+    vi.mocked(getSession).mockResolvedValueOnce({ userId: cashierId, role: 'Cashier', save: vi.fn() } as any);
+    const users = await getUsers();
+    expect(Array.isArray(users)).toBe(true);
+    expect(users.some(u => u.username === 'cashier1')).toBe(true);
+  });
+
+  it('lockStoreAction without session throws UNAUTHORIZED', async () => {
+    vi.mocked(getSession).mockResolvedValueOnce({ save: vi.fn() } as any);
+    await expect(lockStoreAction()).rejects.toThrow(/UNAUTHORIZED/);
+  });
+
+  it('lockStoreAction as Cashier throws RBAC_DENIED', async () => {
+    vi.mocked(getSession).mockResolvedValueOnce({ userId: cashierId, role: 'Cashier', save: vi.fn() } as any);
+    await expect(lockStoreAction()).rejects.toThrow(/RBAC_DENIED/);
+  });
+
+  it('lockStoreAction as Manager locks MLEK then restores secret for later tests', async () => {
+    vi.mocked(getSession).mockResolvedValueOnce({ userId: managerId, role: 'Manager', save: vi.fn() } as any);
+    expect(isMlekUnlocked()).toBe(true);
+    await lockStoreAction();
+    expect(isMlekUnlocked()).toBe(false);
+    setMlekSecret(crypto.randomBytes(32));
+    expect(isMlekUnlocked()).toBe(true);
   });
 });
 
@@ -148,5 +182,38 @@ describe('Concurrency Safety', () => {
     // Final stock should be 0
     const finalItem = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(targetItemId) as { stock_quantity: number };
     expect(finalItem.stock_quantity).toBe(0);
+  });
+
+  it('enforces cashier shift ownership gating on closeShift (H4)', async () => {
+    const cashier1Id = crypto.randomUUID();
+    const cashier2Id = crypto.randomUUID();
+    
+    const u1 = 'cashier_h4_1_' + crypto.randomUUID().slice(0, 8);
+    const u2 = 'cashier_h4_2_' + crypto.randomUUID().slice(0, 8);
+
+    // Create cashiers
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync('pass123', salt, 600000, 32, 'sha512').toString('hex');
+    db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES (?, ?, 'Cashier 1', 'Cashier', ?, ?, 1, 0)`).run(cashier1Id, u1, hash, salt);
+    db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES (?, ?, 'Cashier 2', 'Cashier', ?, ?, 1, 0)`).run(cashier2Id, u2, hash, salt);
+
+    // Login Cashier 1
+    vi.mocked(getSession).mockResolvedValue({ userId: cashier1Id, role: 'Cashier', save: vi.fn() } as any);
+
+    // Open shift for Cashier 1
+    const openRes = await openShift('', 10000);
+    expect(openRes.success).toBe(true);
+    const shiftId = openRes.data;
+
+    // Try to close shift as Cashier 2
+    vi.mocked(getSession).mockResolvedValue({ userId: cashier2Id, role: 'Cashier', save: vi.fn() } as any);
+    const closeRes = await closeShift(shiftId, 10000);
+    expect(closeRes.success).toBe(false);
+    expect(closeRes.error).toContain('RBAC_DENIED');
+
+    // Close shift as Cashier 1 (owner)
+    vi.mocked(getSession).mockResolvedValue({ userId: cashier1Id, role: 'Cashier', save: vi.fn() } as any);
+    const closeResOwner = await closeShift(shiftId, 10000);
+    expect(closeResOwner.success).toBe(true);
   });
 });

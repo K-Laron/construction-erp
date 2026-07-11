@@ -4,15 +4,18 @@ import db from '@/lib/db';
 import { Worker } from 'worker_threads';
 import path from 'path';
 import { checkMlek } from "@/lib/mlek";
+import { requireAuth } from './auth';
 
 // Fetch all G/L accounts
 export async function getTrialBalance(): Promise<{ id: string; code: string; name: string; category: string; balance: number }[]> {
+  await requireAuth();
   checkMlek(false);
   return db.prepare("SELECT * FROM accounts ORDER BY code ASC").all() as { id: string; code: string; name: string; category: string; balance: number }[];
 }
 
 // Daily G/L Integrity Scan: asserts that all entries are balanced
 export async function runDailyGLScan(): Promise<{ isCorrupt: boolean; corruptEntries: string[] }> {
+  await requireAuth(['Manager', 'Admin']);
   checkMlek(false);
   const rows = db.prepare(`
     SELECT journal_entry_id, 
@@ -38,6 +41,7 @@ const REPORT_QUERIES: Record<string, string> = {
 
 // Offload heavy queries to read-only worker threads to prevent main loop blocks
 export async function runHeavyAuditReport(reportType: 'TODAY_SALES' | 'TODAY_COLLECTIONS', params: any[] = []): Promise<{ total: number }[]> {
+  await requireAuth(['Manager', 'Admin']);
   checkMlek(false);
   
   const query = REPORT_QUERIES[reportType];

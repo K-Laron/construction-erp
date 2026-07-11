@@ -55,7 +55,13 @@ export default function Home() {
     setCurrentUser(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const { logoutUser } = await import('@/app/actions/auth');
+      await logoutUser();
+    } catch (err) {
+      logger.error('Failed to log out on server:', err);
+    }
     setCurrentUser(null);
   };
 

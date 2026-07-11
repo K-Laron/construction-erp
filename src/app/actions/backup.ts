@@ -1,6 +1,6 @@
 "use server";
 
-import db from '@/lib/db';
+import db, { swapDatabase } from '@/lib/db';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -8,7 +8,8 @@ import os from 'os';
 import Database from 'better-sqlite3';
 import { getMlekSecret } from "@/lib/mlek";
 import { logger } from '@/lib/logger';
-import { headers } from 'next/headers';
+import { resolveClientIp } from '@/lib/client_ip';
+import { requireAuth } from './auth';
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 300000; // 5 min
@@ -38,21 +39,19 @@ function verifyBackupIntegrity(filePath: string): boolean {
   }
 }
 
-export async function exportEncryptedBackup(providedIp?: string): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
+export async function exportEncryptedBackup(): Promise<{ success: boolean; data?: string; filename?: string; error?: string }> {
+  try {
+    await requireAuth(['Manager', 'Admin']);
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
   const secret = getMlekSecret(false);
   if (!secret) {
     return { success: false, error: "Store is locked." };
   }
 
-  let ipAddress = providedIp;
-  if (!ipAddress) {
-    try {
-      const h = await headers();
-      ipAddress = h.get('x-forwarded-for') || '127.0.0.1';
-    } catch {
-      ipAddress = '127.0.0.1';
-    }
-  }
+  const ipAddress = await resolveClientIp();
 
   if (!checkRateLimit(ipAddress)) {
     return { success: false, error: "Rate limit exceeded. Try again in 5 minutes." };
@@ -118,12 +117,14 @@ export async function exportEncryptedBackup(providedIp?: string): Promise<{ succ
 }
 
 export async function getBackupLogs(): Promise<{ id: string; timestamp: string; action_type: string }[]> {
+  await requireAuth(['Manager', 'Admin']);
   return db.prepare("SELECT id, timestamp, action_type FROM system_audit_logs WHERE action_type IN ('BACKUP_EXPORT', 'BACKUP_IMPORT') ORDER BY timestamp DESC").all() as { id: string; timestamp: string; action_type: string }[];
 }
 
-export async function validateAndRestoreBackup(base64Payload: string, performedByUserId: string): Promise<{ success: boolean; error?: string }> {
+export async function validateAndRestoreBackup(base64Payload: string, _ignoredPerformedByUserId: string): Promise<{ success: boolean; error?: string }> {
   const tempRestorePath = path.join(os.tmpdir(), `restore_temp_${crypto.randomUUID()}.db`);
   try {
+    const performedByUserId = await requireAuth(['Manager', 'Admin']);
     const secret = getMlekSecret(false);
     if (!secret) throw new Error("Store is locked.");
 
@@ -150,9 +151,8 @@ export async function validateAndRestoreBackup(base64Payload: string, performedB
       throw new Error("RESTORE_FAILED: Backup integrity check failed.");
     }
 
-    // Safely copy tempRestorePath to replace data/database.db
-    const mainDbPath = path.join(process.cwd(), 'data', 'database.db');
-    fs.copyFileSync(tempRestorePath, mainDbPath);
+    // Safely close connection, copy tempRestorePath to replace database, and reopen connection
+    swapDatabase(tempRestorePath);
 
     // Audit log
     db.prepare(`

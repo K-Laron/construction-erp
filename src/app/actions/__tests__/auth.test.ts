@@ -7,13 +7,13 @@ import crypto from 'crypto';
 describe('Auth Actions', () => {
   it('enforces rate limiting on login', async () => {
     for (let i = 0; i < 5; i++) {
-      const res = await authenticateUser('fake_user', 'wrong_pass', '192.168.1.100');
+      const res = await authenticateUser('fake_user', 'wrong_pass');
       if (i < 3) {
         expect(res.success).toBe(false);
         expect(res.error).toBe('Invalid username or PIN.');
       }
     }
-    const rateLimited = await authenticateUser('fake_user', 'wrong_pass', '192.168.1.100');
+    const rateLimited = await authenticateUser('fake_user', 'wrong_pass');
     expect(rateLimited.success).toBe(false);
     expect(rateLimited.error).toContain('IP temporarily locked');
   });

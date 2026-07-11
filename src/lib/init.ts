@@ -35,9 +35,15 @@ export function isStoreUnlocked(): boolean {
 }
 
 export function lockStore(): void {
-  const secret = getMlekSecret();
-  if (Buffer.isBuffer(secret)) {
-    secret.fill(0);
+  if (isMlekUnlocked()) {
+    try {
+      const secret = getMlekSecret(false);
+      if (Buffer.isBuffer(secret)) {
+        secret.fill(0);
+      }
+    } catch {
+      // Safe catch if database locks concurrently
+    }
   }
   setMlekSecret(null);
   logger.info('Store locked. MLEK cleared from process memory.');

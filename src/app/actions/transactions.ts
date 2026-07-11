@@ -6,7 +6,7 @@ import { Transaction, TransactionItem } from '@/types';
 import { calculateHMACSignature } from '@/lib/ledger_crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { z } from 'zod';
-import { getActiveUserId } from './auth';
+import { getActiveUserId, requireAuth } from './auth';
 import { getMlekSecret, checkMlek } from "@/lib/mlek";
 
 export interface CartItem {
@@ -79,8 +79,12 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
     overridePin, overrideUsername
   } = payload;
   let { tax } = payload;
+
+  if (paymentMethod === 'Credit' && !customerId) {
+    throw new Error("CREDIT_CUSTOMER_REQUIRED: Credit checkout requires a valid customer ID.");
+  }
   
-  const cashierId = await getActiveUserId();
+  const cashierId = await requireAuth();
 
   let customerPriceTier = 'Retail';
   let isVatExempt = false;
@@ -118,9 +122,12 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
   }
 
   if (totalAmount < 0) throw new Error("Total amount cannot be negative.");
+  if (amountPaid > totalAmount) {
+    throw new Error('OVERPAYMENT_NOT_ALLOWED: amountPaid cannot exceed totalAmount.');
+  }
 
-  // C2 & N1: Force server-side tax recalculation, respecting VAT exemption
-  tax = isVatExempt ? 0 : Math.round(((computedSubtotal - discount) / 1.12) * 0.12);
+  // C2 & N1: Force server-side tax recalculation, respecting VAT exemption (Option A: delivery charge is vatable)
+  tax = isVatExempt ? 0 : Math.round(((computedSubtotal - discount + deliveryFee) / 1.12) * 0.12);
 
   // Manager Override Helper
   const verifyOverride = (pin: string | undefined, managerUsername: string | undefined, errorMsg: string) => {
@@ -166,6 +173,9 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
 
   const transactionId = crypto.randomUUID();
   const balanceDue = totalAmount - amountPaid;
+  if (balanceDue > 0 && !customerId) {
+    throw new Error('CUSTOMER_REQUIRED_FOR_BALANCE: Partial payment requires a customer to hold AR.');
+  }
   const paymentStatus = balanceDue <= 0 ? 'Paid' : (amountPaid === 0 ? 'Unpaid' : 'Partial');
   const deliveryStatus = deliveryFee > 0 ? 'Pending' : 'N/A';
 
@@ -173,12 +183,13 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
   let orNumber: number | null = null;
 
   const result = db.transaction(() => {
+    const txDate = new Date().toISOString();
     // 1. Insert transaction header
     db.prepare(`
       INSERT INTO transactions (id, customer_id, cashier_id, date, subtotal, tax, delivery_fee, discount, total_amount, amount_paid, balance_due, payment_status, payment_method, delivery_status)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      transactionId, customerId, cashierId,
+      transactionId, customerId, cashierId, txDate,
       subtotal, tax, deliveryFee, discount,
       totalAmount, amountPaid, balanceDue,
       paymentStatus, paymentMethod, deliveryStatus
@@ -190,7 +201,9 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const deductStock = db.prepare("UPDATE inventory SET stock_quantity = stock_quantity - ? WHERE id = ?");
+    const deductStockAtomic = db.prepare(
+      "UPDATE inventory SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity >= ?"
+    );
 
     for (const item of items) {
       insertItem.run(
@@ -198,15 +211,26 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
         item.quantity, item.unitUsed, item.unitPrice, item.unitCost, item.totalPrice
       );
       
-      const invItem = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(item.itemId) as { stock_quantity: number };
+      const invItem = db.prepare("SELECT stock_quantity, name FROM inventory WHERE id = ?").get(item.itemId) as { stock_quantity: number; name: string } | undefined;
+      if (!invItem) throw new Error(`Item not found: ${item.itemId}`);
+      if (invItem.stock_quantity < item.quantity) {
+        throw new Error(
+          `INSUFFICIENT_STOCK: ${invItem.name} has ${invItem.stock_quantity} millicounts, need ${item.quantity}`
+        );
+      }
+      const result = deductStockAtomic.run(item.quantity, item.itemId, item.quantity);
+      if (result.changes === 0) {
+        throw new Error(
+          `INSUFFICIENT_STOCK: ${invItem.name} — concurrent stock change prevented deduction.`
+        );
+      }
       const newStock = invItem.stock_quantity - item.quantity;
-      deductStock.run(item.quantity, item.itemId);
 
       // L5: Stock audit trail (direction OUT)
       db.prepare(`
         INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-        VALUES (?, CURRENT_TIMESTAMP, ?, 'STOCK_OUT', ?, ?, ?)
-      `).run(crypto.randomUUID(), cashierId, item.itemId, invItem.stock_quantity.toString(), newStock.toString());
+        VALUES (?, ?, ?, 'STOCK_OUT', ?, ?, ?)
+      `).run(crypto.randomUUID(), txDate, cashierId, item.itemId, invItem.stock_quantity.toString(), newStock.toString());
     }
 
     // 3. Retrieve assigned doc numbers from trigger
@@ -249,14 +273,10 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
     const costOfGoods = items.reduce((sum, i) => sum + Math.round(i.unitCost * i.quantity / 1000), 0);
     const glLines: { accountId: string; type: 'DEBIT' | 'CREDIT'; amount: number }[] = [];
 
-    if (paymentMethod === 'Cash' && amountPaid > 0) {
+    if (amountPaid > 0) {
       glLines.push({ accountId: 'acc-cash', type: 'DEBIT', amount: amountPaid });
     }
-    if ((paymentMethod === 'Credit' || paymentMethod === 'Check') && balanceDue > 0) {
-      glLines.push({ accountId: 'acc-ar', type: 'DEBIT', amount: balanceDue });
-    }
-    // For POS combo payments (e.g. paying part in cash, remainder goes to credit)
-    if (paymentMethod === 'Cash' && amountPaid > 0 && balanceDue > 0) {
+    if (balanceDue > 0) {
       glLines.push({ accountId: 'acc-ar', type: 'DEBIT', amount: balanceDue });
     }
 
@@ -272,13 +292,16 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
       glLines.push({ accountId: 'acc-inv', type: 'CREDIT', amount: costOfGoods });
     }
 
-    // Balance check before posting GL
+    // Balance check before posting GL — fail-closed
     const totalDebits = glLines.filter(l => l.type === 'DEBIT').reduce((s, l) => s + l.amount, 0);
     const totalCredits = glLines.filter(l => l.type === 'CREDIT').reduce((s, l) => s + l.amount, 0);
 
-    if (totalDebits === totalCredits && totalDebits > 0) {
-      createBalancedJournalEntry(`POS Sale: ${transactionId.slice(0, 8)}`, glLines, cashierId);
+    if (totalDebits !== totalCredits || totalDebits === 0) {
+      throw new Error(
+        `GL_UNBALANCED: debits=${totalDebits} credits=${totalCredits} txn=${transactionId}`
+      );
     }
+    createBalancedJournalEntry(`POS Sale: ${transactionId.slice(0, 8)}`, glLines, cashierId);
 
     return { transactionId, siNumber, orNumber };
   })();
@@ -291,6 +314,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
 
 // Fetch all transactions for a date range
 export async function getTransactions(startDate?: string, endDate?: string): Promise<Transaction[]> {
+  await requireAuth();
   checkMlek(false);
   let query = "SELECT * FROM transactions";
   const params: string[] = [];
@@ -306,6 +330,7 @@ export async function getTransactions(startDate?: string, endDate?: string): Pro
 
 // Fetch transaction details with items
 export async function getTransactionDetails(transactionId: string): Promise<{ transaction: Transaction; items: (TransactionItem & { item_name: string; item_unit: string })[] }> {
+  await requireAuth();
   getMlekSecret(false); // Ensure unlocked
   const transaction = db.prepare("SELECT * FROM transactions WHERE id = ?").get(transactionId) as Transaction;
   const items = db.prepare(`
@@ -325,9 +350,10 @@ export async function processReturn(
 ): Promise<{ success: boolean; data?: void; error?: string }> {
   try {
     const parsed = ProcessReturnSchema.parse({ transactionId, itemsToReturn });
+    const processedBy = await requireAuth();
     getMlekSecret(); // Ensure unlocked
-    const processedBy = await getActiveUserId();
 
+    const returnDate = new Date().toISOString();
     db.transaction(() => {
       const tx = db.prepare("SELECT payment_method, balance_due, customer_id, tax, total_amount FROM transactions WHERE id = ?").get(parsed.transactionId) as { payment_method: string; balance_due: number; customer_id: string | null; tax: number; total_amount: number };
       if (!tx) throw new Error("Transaction not found.");
@@ -356,8 +382,8 @@ export async function processReturn(
       // L5: Stock audit trail (direction IN)
       db.prepare(`
         INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-        VALUES (?, CURRENT_TIMESTAMP, ?, 'STOCK_IN', ?, ?, ?)
-      `).run(crypto.randomUUID(), processedBy, item.itemId, invItem.stock_quantity.toString(), newStock.toString());
+        VALUES (?, ?, ?, 'STOCK_IN', ?, ?, ?)
+      `).run(crypto.randomUUID(), returnDate, processedBy, item.itemId, invItem.stock_quantity.toString(), newStock.toString());
 
       totalRefundAmount += Math.round(origItem.unit_price * item.quantity / 1000);
       totalCostRefund += Math.round(origItem.unit_cost * item.quantity / 1000);
@@ -374,44 +400,80 @@ export async function processReturn(
         glLines.push({ accountId: 'acc-vat-payable', type: 'DEBIT', amount: refundVat });
       }
 
-      if (tx.payment_method === 'Credit' && tx.balance_due > 0) {
-        const actualCreditRefund = Math.min(totalRefundAmount, tx.balance_due);
-        const remainderCashRefund = totalRefundAmount - actualCreditRefund;
-        
-        glLines.push({ accountId: 'acc-ar', type: 'CREDIT', amount: actualCreditRefund });
-        if (remainderCashRefund > 0) {
-          glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: remainderCashRefund });
+      let txnCreditRefund = 0;
+      let overallCreditRefund = 0;
+      let cashRefund = 0;
+
+      if (tx.payment_method === 'Credit') {
+        txnCreditRefund = Math.min(totalRefundAmount, tx.balance_due);
+      }
+      const remainingRefund = totalRefundAmount - txnCreditRefund;
+
+      if (remainingRefund > 0 && tx.customer_id) {
+        const cust = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(tx.customer_id) as { current_balance: number } | undefined;
+        const currentBalance = cust ? cust.current_balance : 0;
+        const otherOutstanding = Math.max(0, currentBalance - txnCreditRefund);
+        overallCreditRefund = Math.min(remainingRefund, otherOutstanding);
+      }
+
+      cashRefund = totalRefundAmount - txnCreditRefund - overallCreditRefund;
+
+      const totalArRefund = txnCreditRefund + overallCreditRefund;
+      if (totalArRefund > 0) {
+        glLines.push({ accountId: 'acc-ar', type: 'CREDIT', amount: totalArRefund });
+      }
+      if (cashRefund > 0) {
+        glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: cashRefund });
+      }
+
+      // Update balance due on the transaction
+      if (txnCreditRefund > 0) {
+        db.prepare("UPDATE transactions SET balance_due = balance_due - ? WHERE id = ?").run(txnCreditRefund, parsed.transactionId);
+      }
+
+      // Reconcile other outstanding invoices' balance_due (FIFO order)
+      if (overallCreditRefund > 0 && tx.customer_id) {
+        const otherTxns = db.prepare(`
+          SELECT id, balance_due FROM transactions
+          WHERE customer_id = ? AND balance_due > 0 AND id != ?
+          ORDER BY date ASC
+        `).all(tx.customer_id, parsed.transactionId) as { id: string; balance_due: number }[];
+
+        let remainingOverall = overallCreditRefund;
+        const updateTxnBalance = db.prepare("UPDATE transactions SET balance_due = balance_due - ? WHERE id = ?");
+
+        for (const oTx of otherTxns) {
+          if (remainingOverall <= 0) break;
+          const toReduce = Math.min(remainingOverall, oTx.balance_due);
+          updateTxnBalance.run(toReduce, oTx.id);
+          remainingOverall -= toReduce;
         }
+      }
+
+      // Update customer balance and ledger
+      if (totalArRefund > 0 && tx.customer_id) {
+        db.prepare("UPDATE customers SET current_balance = current_balance - ? WHERE id = ?").run(totalArRefund, tx.customer_id);
         
-        // Update balance due on the transaction
-        db.prepare("UPDATE transactions SET balance_due = balance_due - ? WHERE id = ?").run(actualCreditRefund, parsed.transactionId);
+        const lastLedger = db.prepare(`SELECT hmac_signature FROM customer_ledger WHERE customer_id = ? ORDER BY date DESC LIMIT 1`).get(tx.customer_id) as { hmac_signature: string } | undefined;
+        const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
+        const ledgerId = crypto.randomUUID();
+        
+        const entryData = {
+          id: ledgerId,
+          customer_id: tx.customer_id,
+          date: new Date().toISOString(),
+          type: 'CREDIT' as const,
+          amount: totalArRefund,
+          reference_id: parsed.transactionId,
+          description: `Return reversal (AR) - Txn ${parsed.transactionId.slice(0, 8)}`
+        };
 
-        // Reverse customer ledger
-        if (tx.customer_id) {
-          db.prepare("UPDATE customers SET current_balance = current_balance - ? WHERE id = ?").run(actualCreditRefund, tx.customer_id);
-          const lastLedger = db.prepare(`SELECT hmac_signature FROM customer_ledger WHERE customer_id = ? ORDER BY date DESC LIMIT 1`).get(tx.customer_id) as { hmac_signature: string } | undefined;
-          const prevSig = lastLedger ? lastLedger.hmac_signature : "GENESIS";
-          const ledgerId = crypto.randomUUID();
-          
-          const entryData = {
-            id: ledgerId,
-            customer_id: tx.customer_id,
-            date: new Date().toISOString(),
-            type: 'CREDIT' as const,
-            amount: actualCreditRefund,
-            reference_id: parsed.transactionId,
-            description: `Return reversal - Txn ${parsed.transactionId.slice(0, 8)}`
-          };
+        const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
 
-          const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
-
-          db.prepare(`
-            INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
-            VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)
-          `).run(ledgerId, tx.customer_id, entryData.date, entryData.amount, parsed.transactionId, entryData.description, signature, processedBy);
-        }
-      } else {
-        glLines.push({ accountId: 'acc-cash', type: 'CREDIT', amount: totalRefundAmount });
+        db.prepare(`
+          INSERT INTO customer_ledger (id, customer_id, date, type, amount, reference_id, description, hmac_signature, cashier_id)
+          VALUES (?, ?, ?, 'CREDIT', ?, ?, ?, ?, ?)
+        `).run(ledgerId, tx.customer_id, entryData.date, totalArRefund, parsed.transactionId, entryData.description, signature, processedBy);
       }
 
       // Cost of Sales reversal
@@ -430,8 +492,8 @@ export async function processReturn(
     // Audit log
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, ?, 'SALE_RETURN', ?, NULL, ?)
-    `).run(crypto.randomUUID(), processedBy, parsed.transactionId, `Returned ${parsed.itemsToReturn.length} line items`);
+      VALUES (?, ?, ?, 'SALE_RETURN', ?, NULL, ?)
+    `).run(crypto.randomUUID(), returnDate, processedBy, parsed.transactionId, `Returned ${parsed.itemsToReturn.length} line items`);
   })();
 
     return { success: true };

@@ -3,14 +3,14 @@ module.exports = async function(db, mlekSecretHex) {
   const crypto = require('crypto');
 
   function oldSig(entry, prevSig) {
-    const entityId = entry.customer_id || '';
+    const entityId = entry.customer_id || entry.supplier_id || '';
     const dateStr = entry.date || '';
     const data = `${entry.id}-${entityId}-${entry.amount}-${entry.type}-${dateStr}-${prevSig}`;
     return crypto.createHmac('sha256', mlekSecret).update(data).digest('hex');
   }
 
   function newSig(entry, prevSig) {
-    const entityId = entry.customer_id || '';
+    const entityId = entry.customer_id || entry.supplier_id || '';
     const dateStr = entry.date || '';
     const refId = entry.reference_id || '';
     const desc = entry.description || '';

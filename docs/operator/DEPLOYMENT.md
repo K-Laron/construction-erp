@@ -49,6 +49,8 @@ Create a `.env.local` file in the project root:
 SESSION_PASSWORD=your_secure_random_string_at_least_32_characters
 # Optional: Set to 'false' if running on a local LAN over unencrypted HTTP (no SSL) in production mode
 SESSION_SECURE=true
+TRUST_PROXY=true
+# Optional: Set to 'true' if behind a reverse proxy. When enabled, the first hop of X-Forwarded-For is used for rate-limiting. Default (unset or false): client IP always resolves to 127.0.0.1.
 ```
 
 > [!CAUTION]
@@ -181,6 +183,8 @@ The system enforces progressive lockout to prevent brute-force attacks:
 
 > [!NOTE]
 > Rate limiting state is held in-memory and resets on server restart. Persistent attackers on a LAN should be addressed at the network level.
+>
+> The client IP is resolved server-side via resolveClientIp() — never from a client-supplied argument. In LAN mode (default), all clients appear as 127.0.0.1, so IP-based rate limiting applies per-device only behind a reverse proxy with TRUST_PROXY=true.
 
 ---
 
@@ -290,6 +294,12 @@ Some migrations require access to decrypted data (e.g., re-encrypting fields und
 | **Inactivity Auto-Lock** | MLEK automatically zero-filled and evicted from server process memory after 30 minutes of inactivity |
 | **Backup Integrity Verification** | Every backup checkpoint is verified using `PRAGMA integrity_check` prior to GCM encryption |
 | **Zod Input Boundaries** | Mutating Server Actions strictly validate all parameters against schemas before database transactions |
+| **Fail-closed G/L posting** | Every successful sale posts a balanced journal entry or the entire checkout rolls back — no silent G/L drops |
+| **FIFO customer payment allocation** | Payments are applied to open invoices in oldest-first order, reducing balance_due and updating payment_status |
+| **Idempotent goods receipt** | receiveGoods rejects POs already in 'Received' or 'Cancelled' status via atomic conditional UPDATE |
+| **Atomic stock deduction** | Stock is deducted with `stock_quantity >= ?` guard; insufficient stock throws INSUFFICIENT_STOCK with item name |
+| **Customer/supplier payment floors** | recordPayment and recordSupplierPayment reject amounts exceeding outstanding balance |
+| **Z-reading VAT Option A** | Vatable sales include delivery_fee in the tax base: vatable_sales = (subtotal - discount + delivery_fee) - tax |
 | **Structured JSON Logging** | Production logging outputs single-line JSON with dynamic request context `x-trace-id` trace correlation |
 
 ---

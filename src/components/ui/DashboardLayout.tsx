@@ -44,7 +44,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-transparent">
-      <SidebarNav activeView={activeView} onNavigate={onNavigate} />
+      <SidebarNav activeView={activeView} onNavigate={onNavigate} currentUser={currentUser} />
 
       <div className="flex flex-col flex-1 min-w-0">
         <header

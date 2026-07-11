@@ -32,7 +32,7 @@ export async function GET(): Promise<NextResponse> {
     checks.active_shifts = 'unavailable';
   }
 
-  const healthy = checks.database === 'ok' && checks.store_unlocked !== undefined;
+  const healthy = checks.database === 'ok' && checks.store_unlocked === true;
 
   return NextResponse.json(
     { status: healthy ? 'healthy' : 'degraded', checks, timestamp: new Date().toISOString() },

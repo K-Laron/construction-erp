@@ -15,17 +15,50 @@ declare global {
 }
 
 const dbPath = process.env.NODE_ENV === 'test' ? ':memory:' : path.join(dbDir, 'database.db');
-const db = globalThis.dbInstance || new Database(dbPath);
+let activeDb = globalThis.dbInstance || new Database(dbPath);
 
 if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
-  globalThis.dbInstance = db;
+  globalThis.dbInstance = activeDb;
 }
 
 // Configure WAL mode and concurrency locks
-db.pragma('journal_mode = WAL');
-db.pragma('synchronous = NORMAL');
-db.pragma('busy_timeout = 10000');
-db.pragma('foreign_keys = ON');
+activeDb.pragma('journal_mode = WAL');
+activeDb.pragma('synchronous = NORMAL');
+activeDb.pragma('busy_timeout = 10000');
+activeDb.pragma('foreign_keys = ON');
+
+export function swapDatabase(tempRestorePath: string) {
+  activeDb.close();
+  if (dbPath !== ':memory:') {
+    fs.copyFileSync(tempRestorePath, dbPath);
+    activeDb = new Database(dbPath);
+  } else {
+    activeDb = new Database(tempRestorePath);
+  }
+  activeDb.pragma('journal_mode = WAL');
+  activeDb.pragma('synchronous = NORMAL');
+  activeDb.pragma('busy_timeout = 10000');
+  activeDb.pragma('foreign_keys = ON');
+  if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+    globalThis.dbInstance = activeDb;
+  }
+}
+
+const dbProxy = new Proxy({} as DatabaseType, {
+  get(target, prop, receiver) {
+    const targetDb = activeDb;
+    const value = Reflect.get(targetDb, prop);
+    if (typeof value === 'function') {
+      return value.bind(targetDb);
+    }
+    return value;
+  },
+  set(target, prop, value, receiver) {
+    return Reflect.set(activeDb, prop, value);
+  }
+});
+
+const db = dbProxy;
 
 export async function runMigrations(mlekSecret?: string) {
   // Ensure migration tracker table exists

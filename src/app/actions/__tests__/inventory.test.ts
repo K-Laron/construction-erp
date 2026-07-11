@@ -1,9 +1,61 @@
 import { describe, it, expect } from 'vitest';
 import db from '@/lib/db';
-import { createPurchaseOrder, receiveGoods } from '../inventory';
+import { createPurchaseOrder, receiveGoods, recordSupplierPayment } from '../inventory';
 import crypto from 'crypto';
 
 describe('Inventory Actions', () => {
+  it('rejects double receiveGoods (idempotency)', async () => {
+    const supplierId = crypto.randomUUID();
+    db.prepare(`INSERT INTO suppliers (id, name, current_balance, is_active) VALUES (?, 'Double Recv Supplier', 0, 1)`).run(supplierId);
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active)
+      VALUES (?, 'Double Recv Item', 'Hardware', 'pc', 10000, 1000, 2000, 1800, 1)`).run(itemId);
+
+    const poRes = await createPurchaseOrder(supplierId, 'Credit', [
+      { itemId, qtyMillicounts: 5000, unitPriceCentavos: 2000 }
+    ]);
+    expect(poRes.success).toBe(true);
+    const poId = poRes.data!;
+
+    const stockBefore = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(itemId) as { stock_quantity: number };
+    const supplierBefore = db.prepare("SELECT current_balance FROM suppliers WHERE id = ?").get(supplierId) as { current_balance: number };
+
+    // First receive should succeed
+    const firstRes = await receiveGoods(poId, 'test-user');
+    expect(firstRes.success).toBe(true);
+
+    const stockAfterFirst = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(itemId) as { stock_quantity: number };
+    expect(stockAfterFirst.stock_quantity).toBe(stockBefore.stock_quantity + 5000);
+
+    // Second receive should fail
+    const secondRes = await receiveGoods(poId, 'test-user');
+    expect(secondRes.success).toBe(false);
+    expect(secondRes.error).toMatch(/ALREADY_RECEIVED|INVALID_PO_STATUS/i);
+
+    // Stock unchanged after second attempt
+    const stockAfterSecond = db.prepare("SELECT stock_quantity FROM inventory WHERE id = ?").get(itemId) as { stock_quantity: number };
+    expect(stockAfterSecond.stock_quantity).toBe(stockAfterFirst.stock_quantity);
+
+    // Supplier balance not doubled
+    const supplierAfter = db.prepare("SELECT current_balance FROM suppliers WHERE id = ?").get(supplierId) as { current_balance: number };
+    expect(supplierAfter.current_balance).toBe(supplierBefore.current_balance + 10000); // 5 * 2000 = 10000 centavos
+  });
+
+  it('rejects supplier payment exceeding outstanding balance', async () => {
+    const supplierId = crypto.randomUUID();
+    db.prepare(`INSERT INTO suppliers (id, name, current_balance, is_active) VALUES (?, 'Floor Supplier', 500, 1)`).run(supplierId);
+
+    // Try to pay 501 when balance is only 500
+    const res = await recordSupplierPayment(supplierId, 501, 'Overpay attempt');
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/OVERPAYMENT|exceed|balance/i);
+
+    // Balance unchanged
+    const supAfter = db.prepare("SELECT current_balance FROM suppliers WHERE id = ?").get(supplierId) as { current_balance: number };
+    expect(supAfter.current_balance).toBe(500);
+  });
+
   it('recalculates WAC correctly on processPO', async () => {
     // Insert a dummy supplier
     const supplierId = crypto.randomUUID();
