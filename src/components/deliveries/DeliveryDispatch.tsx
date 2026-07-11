@@ -1,5 +1,5 @@
 "use client";
-import { SkeletonTable } from "@/components/ui/Skeleton";
+import { SkeletonLine } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 
@@ -88,7 +88,7 @@ export default function DeliveryDispatch() {
       </div>
 
       {loading ? (
-        <SkeletonTable rows={3} cols={5} />
+        <SkeletonLine className="w-full h-48" />
       ) : deliveries.length === 0 ? (
         <div className="border border-surface-800 rounded-xl p-12 text-center text-interactive-400 text-sm">
           No pending or partially completed deliveries found in queue.

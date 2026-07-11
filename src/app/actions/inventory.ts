@@ -5,7 +5,7 @@ import { encryptField, decryptField } from '@/lib/crypto';
 import { InventoryItem, Supplier, SupplierLedgerEntry } from '@/types';
 import crypto from 'crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
-import { calculateHMACSignature } from '@/lib/ledger_crypto';
+import { calculateHMACSignature } from '@/lib/ledger_helpers';
 import { getActiveUserId, requireAuth } from './auth';
 import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
@@ -102,8 +102,8 @@ export async function deactivateProduct(id: string): Promise<{ success: boolean;
 
 // Fetch active suppliers
 export async function getSuppliers(): Promise<Supplier[]> {
-  const secret = getMlekSecret(false);
   await requireAuth();
+  const secret = getMlekSecret(false);
   const rows = db.prepare("SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name ASC").all() as { id: string, name: string, contact_person: string | null, phone: string | null, email: string | null, current_balance: number, is_active: number }[];
 
   return rows.map(r => ({
@@ -211,7 +211,7 @@ const ReceiveGoodsSchema = z.object({
 });
 
 // Receive Goods & Update Weighted Average Cost (WAC)
-export async function receiveGoods(purchaseOrderId: string, _ignoredReceivedBy: string): Promise<{ success: boolean; data?: string; error?: string }> {
+export async function receiveGoods(purchaseOrderId: string): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
     const parsed = ReceiveGoodsSchema.parse({ purchaseOrderId });
     getMlekSecret();

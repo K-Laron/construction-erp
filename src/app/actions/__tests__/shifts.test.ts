@@ -8,7 +8,7 @@ describe('Shift Actions', () => {
     const userId = crypto.randomUUID();
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES (?, 'cashier_vat', 'VAT Cashier', 'Cashier', 'hash', 'salt', 1, 0)`).run(userId);
 
-    const openRes = await openShift(userId, 5000);
+    const openRes = await openShift(5000);
     if (!openRes.success) throw new Error("OPEN_FAILED: " + openRes.error);
     const shiftId = openRes.data;
     const txDate = new Date().toISOString();
@@ -42,7 +42,7 @@ describe('Shift Actions', () => {
     const userId = crypto.randomUUID();
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES (?, 'cashier1', 'Cashier', 'Cashier', 'hash', 'salt', 1, 0)`).run(userId);
 
-    const openRes = await openShift(userId, 5000); // 5000 centavos float
+    const openRes = await openShift(5000); // 5000 centavos float
     if (!openRes.success) throw new Error("OPEN_FAILED: " + openRes.error);
     const shiftId = openRes.data;
 

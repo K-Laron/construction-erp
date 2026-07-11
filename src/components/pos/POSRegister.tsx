@@ -1,5 +1,5 @@
 "use client";
-import { SkeletonTable } from "@/components/ui/Skeleton";
+
 
 import { useState, useEffect } from 'react';
 import { logger } from "@/lib/logger";

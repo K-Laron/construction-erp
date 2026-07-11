@@ -4,7 +4,7 @@ import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
 import { Customer, CustomerLedgerEntry } from '@/types';
 import crypto from 'crypto';
-import { calculateHMACSignature } from '@/lib/ledger_crypto';
+import { calculateHMACSignature } from '@/lib/ledger_helpers';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { getActiveUserId, requireAuth } from './auth';
 import { getMlekSecret } from "@/lib/mlek";
@@ -171,7 +171,8 @@ export async function recordPayment(customerId: string, amount: number, descript
         type: 'CREDIT' as const,
         amount: parsed.amount,
         reference_id: null,
-        description: parsed.description
+        description: parsed.description,
+        cashier_id: cashierId
       };
 
       const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());

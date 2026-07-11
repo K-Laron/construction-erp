@@ -40,25 +40,25 @@ describe('Production Hardening Features', () => {
     });
 
     it('rejects invalid inputs on open shift', async () => {
-      const res = await openShift('user_1', -100);
+      const res = await openShift(-100);
       expect(res.success).toBe(false);
       expect(res.error).toBeDefined();
     });
 
     it('rejects invalid inputs on user creation', async () => {
-      const res = await createUser('createdBy', 'ab', 'Test User', 'Cashier', '12345');
+      const res = await createUser('ab', 'Test User', 'Cashier', '12345');
       expect(res.success).toBe(false);
       expect(res.error).toBeDefined();
     });
 
     it('rejects invalid inputs on update cost price', async () => {
-      const res = await updateCostPrice('user_1', 'invalid-uuid', -500);
+      const res = await updateCostPrice('invalid-uuid', -500);
       expect(res.success).toBe(false);
       expect(res.error).toBeDefined();
     });
 
     it('rejects invalid inputs on override credit limit', async () => {
-      const res = await overrideCreditLimit('user_1', 'invalid-uuid', -1000);
+      const res = await overrideCreditLimit('invalid-uuid', -1000);
       expect(res.success).toBe(false);
       expect(res.error).toBeDefined();
     });

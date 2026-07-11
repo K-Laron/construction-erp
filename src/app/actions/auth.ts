@@ -3,9 +3,8 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getSession } from '@/lib/session';
-import { checkMlek } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
-import { resolveClientIp } from '@/lib/client_ip';
 
 const CreateUserSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters long"),
@@ -58,7 +57,7 @@ export async function logoutUser(): Promise<{ success: boolean }> {
 
 // Authenticate user via PIN
 export async function authenticateUser(username: string, pin: string): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
-  const ipAddress = await resolveClientIp();
+  const ipAddress = '127.0.0.1';
 
   const timeframe5Min = Date.now() - 300000;
   const timeframe15Min = Date.now() - 900000;
@@ -127,7 +126,6 @@ export async function authenticateUser(username: string, pin: string): Promise<{
 
 // Create a new user (Manager/Admin only)
 export async function createUser(
-  _ignoredCreatedBy: string,
   username: string,
   name: string,
   role: 'Cashier' | 'Manager' | 'Admin',
@@ -135,7 +133,7 @@ export async function createUser(
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
     const parsed = CreateUserSchema.parse({ username, name, role, pin });
-    checkMlek();
+    getMlekSecret();
     const createdBy = await checkManagerRole();
 
     const salt = crypto.randomBytes(16).toString('hex');
@@ -165,10 +163,10 @@ export async function getUsers(): Promise<{ id: string; username: string; name: 
 }
 
 // Update cost price (Manager/Admin + MLEK required)
-export async function updateCostPrice(_ignoredUserId: string, itemId: string, newCostCentavos: number): Promise<{ success: boolean; error?: string }> {
+export async function updateCostPrice(itemId: string, newCostCentavos: number): Promise<{ success: boolean; error?: string }> {
   try {
     const parsed = UpdateCostPriceSchema.parse({ itemId, newCostCentavos });
-    checkMlek();
+    getMlekSecret();
     const userId = await checkManagerRole();
 
     const old = db.prepare("SELECT cost_price FROM inventory WHERE id = ?").get(parsed.itemId) as { cost_price: number } | undefined;
@@ -188,10 +186,10 @@ export async function updateCostPrice(_ignoredUserId: string, itemId: string, ne
 }
 
 // Override credit limit (Manager/Admin + MLEK required)
-export async function overrideCreditLimit(_ignoredUserId: string, customerId: string, newLimitCentavos: number): Promise<{ success: boolean; error?: string }> {
+export async function overrideCreditLimit(customerId: string, newLimitCentavos: number): Promise<{ success: boolean; error?: string }> {
   try {
     const parsed = OverrideCreditLimitSchema.parse({ customerId, newLimitCentavos });
-    checkMlek();
+    getMlekSecret();
     const userId = await checkManagerRole();
 
     const old = db.prepare("SELECT credit_limit FROM customers WHERE id = ?").get(parsed.customerId) as { credit_limit: number } | undefined;

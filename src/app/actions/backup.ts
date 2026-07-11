@@ -8,15 +8,27 @@ import os from 'os';
 import Database from 'better-sqlite3';
 import { getMlekSecret } from "@/lib/mlek";
 import { logger } from '@/lib/logger';
-import { resolveClientIp } from '@/lib/client_ip';
 import { requireAuth } from './auth';
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 300000; // 5 min
+const RATE_LIMIT_CLEANUP_INTERVAL = 600000; // 10 min
 const backupIpTracker = new Map<string, { count: number; windowStart: number }>();
+let lastCleanup = 0;
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Periodic sweep to evict stale entries
+  if (now - lastCleanup > RATE_LIMIT_CLEANUP_INTERVAL) {
+    for (const [key, entry] of backupIpTracker) {
+      if (now - entry.windowStart > RATE_LIMIT_WINDOW) {
+        backupIpTracker.delete(key);
+      }
+    }
+    lastCleanup = now;
+  }
+
   const entry = backupIpTracker.get(ip);
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
     backupIpTracker.set(ip, { count: 1, windowStart: now });
@@ -51,7 +63,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     return { success: false, error: "Store is locked." };
   }
 
-  const ipAddress = await resolveClientIp();
+  const ipAddress = '127.0.0.1';
 
   if (!checkRateLimit(ipAddress)) {
     return { success: false, error: "Rate limit exceeded. Try again in 5 minutes." };
@@ -121,7 +133,7 @@ export async function getBackupLogs(): Promise<{ id: string; timestamp: string; 
   return db.prepare("SELECT id, timestamp, action_type FROM system_audit_logs WHERE action_type IN ('BACKUP_EXPORT', 'BACKUP_IMPORT') ORDER BY timestamp DESC").all() as { id: string; timestamp: string; action_type: string }[];
 }
 
-export async function validateAndRestoreBackup(base64Payload: string, _ignoredPerformedByUserId: string): Promise<{ success: boolean; error?: string }> {
+export async function validateAndRestoreBackup(base64Payload: string): Promise<{ success: boolean; error?: string }> {
   const tempRestorePath = path.join(os.tmpdir(), `restore_temp_${crypto.randomUUID()}.db`);
   try {
     const performedByUserId = await requireAuth(['Manager', 'Admin']);

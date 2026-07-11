@@ -3,11 +3,11 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { Transaction, TransactionItem } from '@/types';
-import { calculateHMACSignature } from '@/lib/ledger_crypto';
+import { calculateHMACSignature } from '@/lib/ledger_helpers';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { z } from 'zod';
 import { getActiveUserId, requireAuth } from './auth';
-import { getMlekSecret, checkMlek } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
 
 export interface CartItem {
   itemId: string;
@@ -70,7 +70,7 @@ export const ProcessReturnSchema = z.object({
 // Main checkout action
 export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ success: boolean; data?: { transactionId: string; siNumber: number | null; orNumber: number | null }; error?: string }> {
   try {
-  checkMlek();
+  getMlekSecret();
 
   const payload = CheckoutPayloadSchema.parse(rawPayload);
   const {
@@ -258,7 +258,8 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
         type: 'DEBIT' as const,
         amount: balanceDue,
         reference_id: transactionId,
-        description: `Sales Invoice charge - Txn ${transactionId.slice(0, 8)}`
+        description: `Sales Invoice charge - Txn ${transactionId.slice(0, 8)}`,
+        cashier_id: cashierId
       };
 
       const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());
@@ -315,7 +316,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
 // Fetch all transactions for a date range
 export async function getTransactions(startDate?: string, endDate?: string): Promise<Transaction[]> {
   await requireAuth();
-  checkMlek(false);
+  getMlekSecret(false);
   let query = "SELECT * FROM transactions";
   const params: string[] = [];
 
@@ -465,7 +466,8 @@ export async function processReturn(
           type: 'CREDIT' as const,
           amount: totalArRefund,
           reference_id: parsed.transactionId,
-          description: `Return reversal (AR) - Txn ${parsed.transactionId.slice(0, 8)}`
+          description: `Return reversal (AR) - Txn ${parsed.transactionId.slice(0, 8)}`,
+          cashier_id: processedBy
         };
 
         const signature = calculateHMACSignature(entryData, prevSig, getMlekSecret());

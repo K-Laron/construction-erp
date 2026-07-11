@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { getCustomerLedger } from '../customers';
-import { calculateHMACSignature } from '@/lib/ledger_crypto';
+import { calculateHMACSignature } from '@/lib/ledger_helpers';
 import db from '@/lib/db';
 import crypto from 'crypto';
-import { getMlekSecret, checkMlek, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getMlekSecret, setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
+import { getTrialBalance, runDailyGLScan } from '../ledger';
 
 describe('Ledger Actions', () => {
   it('verifies HMAC chain correctly for customers and detects tampering', async () => {
@@ -32,5 +33,34 @@ describe('Ledger Actions', () => {
 
     const invalidResult = await getCustomerLedger(customerId);
     expect(invalidResult.isIntegrityViolated).toBe(true);
+  });
+});
+
+describe('Trial Balance & GL Scan', () => {
+  it('getTrialBalance returns all accounts', async () => {
+    const accounts = await getTrialBalance();
+    expect(accounts.length).toBeGreaterThanOrEqual(11);
+    const cash = accounts.find(a => a.id === 'acc-cash');
+    expect(cash).toBeDefined();
+    expect(cash!.code).toBe('1010');
+    expect(cash!.category).toBe('Asset');
+  });
+
+  it('runDailyGLScan reports clean for balanced entries', async () => {
+    const result = await runDailyGLScan();
+    expect(result.isCorrupt).toBe(false);
+    expect(result.corruptEntries).toEqual([]);
+  });
+
+  it('runDailyGLScan detects unbalanced entry', async () => {
+    // Insert an unbalanced journal entry
+    const jeId = crypto.randomUUID();
+    db.prepare(`INSERT INTO journal_entries (id, date, description, created_by) VALUES (?, CURRENT_TIMESTAMP, 'Unbalanced Test', 'system-daemon')`).run(jeId);
+    db.prepare(`INSERT INTO journal_lines (id, journal_entry_id, account_id, type, amount) VALUES (?, ?, 'acc-cash', 'DEBIT', 1000)`).run(crypto.randomUUID(), jeId);
+    // No matching CREDIT — entry is unbalanced
+
+    const result = await runDailyGLScan();
+    expect(result.isCorrupt).toBe(true);
+    expect(result.corruptEntries).toContain(jeId);
   });
 });

@@ -23,10 +23,6 @@ export function getMlekSecret(updateActivity = true): Buffer {
   return secret;
 }
 
-export function checkMlek(updateActivity = true): void {
-  getMlekSecret(updateActivity);
-}
-
 export function setMlekSecret(secret: Buffer | null): void {
   globalThis.mlekSecret = secret ?? undefined;
   globalThis.mlekLastActivity = secret ? Date.now() : undefined;

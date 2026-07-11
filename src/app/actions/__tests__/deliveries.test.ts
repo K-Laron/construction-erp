@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import db from '@/lib/db';
-import { dispatchDelivery } from '../deliveries';
+import { dispatchDelivery, confirmDelivery, getDeliveryHistory, getPendingDeliveries } from '../deliveries';
 import { getMlekSecret, setMlekSecret } from '@/lib/mlek';
 import crypto from 'crypto';
 import { runMigrations } from '@/lib/db';
@@ -66,5 +66,38 @@ describe('Deliveries API', () => {
     ]);
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/DISPATCH_EXCEEDS_REMAINING/);
+  });
+
+  it('confirmDelivery updates status to Delivered', async () => {
+    const { data: deliveryId } = await dispatchDelivery(transactionId, 'Jane', 'XYZ-999', [
+      { itemId, quantityDelivered: 2000 }
+    ]);
+
+    await confirmDelivery(deliveryId);
+
+    const del = db.prepare("SELECT status FROM deliveries WHERE id = ?").get(deliveryId) as { status: string };
+    expect(del.status).toBe('Delivered');
+  });
+
+  it('getDeliveryHistory returns full delivery details with items', async () => {
+    const { data: deliveryId } = await dispatchDelivery(transactionId, 'History Driver', 'HST-001', [
+      { itemId, quantityDelivered: 3000 }
+    ]);
+
+    const history = await getDeliveryHistory(transactionId);
+    expect(history.length).toBe(1);
+    expect(history[0].driver_name).toBe('History Driver');
+    expect(history[0].truck_plate).toBe('HST-001');
+    expect(history[0].items.length).toBe(1);
+    expect(history[0].items[0].item_name).toBe('Nails');
+    expect(history[0].items[0].quantity_delivered).toBe(3000);
+  });
+
+  it('getPendingDeliveries returns pending transactions', async () => {
+    const pending = await getPendingDeliveries();
+    expect(pending.length).toBeGreaterThanOrEqual(1);
+    const match = pending.find(p => p.transaction_id === transactionId);
+    expect(match).toBeDefined();
+    expect(match!.delivery_status).toBe('Pending');
   });
 });

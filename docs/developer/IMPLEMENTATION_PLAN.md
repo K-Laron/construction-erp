@@ -436,7 +436,8 @@ node scratch/verify-all-modules.js
 - Added `public/sw.js` service worker for static asset caching
 - Added `src/components/ui/PWA.tsx` component for service worker registration
 - Integrated into `src/app/layout.tsx`
-- Status: ✅ Complete
+- **Later removed** — PWA not needed for LAN terminal deployment. Manifest and SW files remain on disk.
+- Status: ✅ Complete (removed)
 
 #### Task 13.3: ErrorBoundary
 - Added `src/components/ui/ErrorBoundary.tsx` wrapping dashboard views
@@ -583,13 +584,13 @@ node scratch/verify-all-modules.js
 
 ---
 
-## Current Project Health (as of Phase 17)
-- **Test Suites:** 13 (10 server action + 3 component)
-- **Tests:** 41, all passing
+## Current Project Health (as of Phase 17 + audit cleanup)
+- **Test Suites:** 16 (12 server action + 3 component + 1 library)
+- **Tests:** 103, all passing
 - **TypeScript:** `tsc --noEmit` clean
 - **Security:** Zero known vulnerabilities. `Math.random()` eliminated from all security-sensitive paths. All catch blocks use `unknown` type narrowing. All form labels have `htmlFor`/`id` associations. No stray UI toasts. React key warnings resolved. RBAC enforcement tested. Parallel stock-deduction concurrency tested.
-- **Migrations:** 5 SQL migrations, 1 programmatic JS migration
+- **Migrations:** 6 SQL migrations, 2 programmatic JS migrations
 - **Server Actions:** 10, all with structured error returns
-- **Components:** 22 (including UI primitives)
+- **Components:** 19 (including UI primitives)
 - **Receipt:** A6 portrait (105×148mm), 5-column ruled table, underline fields, signatures footer, 6mm margins
-- **Shared Libraries:** 11 (including workers)
+- **Shared Libraries:** 9

@@ -3,7 +3,7 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId, requireAuth } from './auth';
-import { checkMlek } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
 
 const OpenShiftSchema = z.object({
@@ -16,10 +16,10 @@ const CloseShiftSchema = z.object({
 });
 
 // Open a new cashier shift
-export async function openShift(_ignoredCashierId: string, openingFloat: number): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function openShift(openingFloat: number): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     const parsed = OpenShiftSchema.parse({ openingFloat });
-    checkMlek();
+    getMlekSecret();
     const cashierId = await requireAuth();
 
     // Only one open shift per cashier
@@ -44,7 +44,7 @@ export async function openShift(_ignoredCashierId: string, openingFloat: number)
 export async function closeShift(shiftId: string, actualCash: number): Promise<{ success: boolean; data?: { zReadingId: string; discrepancy: number }; error?: string }> {
   try {
     const parsed = CloseShiftSchema.parse({ shiftId, actualCash });
-    checkMlek();
+    getMlekSecret();
 
     const activeUserId = await requireAuth();
     const activeUser = db.prepare("SELECT role FROM users WHERE id = ?").get(activeUserId) as { role: string } | undefined;
@@ -139,23 +139,23 @@ export async function closeShift(shiftId: string, actualCash: number): Promise<{
   }
 }
 
-export async function getCurrentShift(_ignoredCashierId: string): Promise<any | null> {
+export async function getCurrentShift(): Promise<any | null> {
   const cashierId = await requireAuth();
-  checkMlek(false);
+  getMlekSecret(false);
   return db.prepare("SELECT * FROM shifts WHERE cashier_id = ? AND status = 'Open' LIMIT 1").get(cashierId) || null;
 }
 
 // Get Z-Reading for a closed shift
 export async function getZReading(shiftId: string): Promise<any | null> {
   await requireAuth();
-  checkMlek(false);
+  getMlekSecret(false);
   return db.prepare("SELECT * FROM shift_z_readings WHERE shift_id = ?").get(shiftId) || null;
 }
 
 // Get all shifts (paginated)
 export async function getShiftHistory(limit: number = 50, offset: number = 0): Promise<any[]> {
   await requireAuth(['Manager', 'Admin']);
-  checkMlek(false);
+  getMlekSecret(false);
   return db.prepare(`
     SELECT s.*, u.name as cashier_name 
     FROM shifts s 

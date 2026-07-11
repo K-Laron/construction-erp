@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 import db from '@/lib/db';
 import { processCheckout } from '../transactions';
-import { recordPayment } from '../customers';
+import { recordPayment, createCustomer, getCustomers, deactivateCustomer, verifyAllCustomersIntegrity } from '../customers';
 
 function sumAccount(accountId: string, type: 'DEBIT' | 'CREDIT') {
   return (db.prepare(
@@ -135,5 +135,99 @@ describe('Customer Payment Invoice Allocation (FIFO)', () => {
     const res = await recordPayment(customerId, 501, 'Overpay attempt');
     expect(res.success).toBe(false);
     expect(res.error).toMatch(/OVERPAYMENT|exceed|balance/i);
+  });
+});
+
+describe('Customer CRUD', () => {
+  it('creates a new customer', async () => {
+    const res = await createCustomer('Test New', '09170000000', '123 Test St', 5000, 'Retail', 0);
+    expect(res.success).toBe(true);
+    expect(res.data).toBeDefined();
+
+    const cust = db.prepare("SELECT name, credit_limit, price_tier, is_vat_exempt, is_active FROM customers WHERE id = ?").get(res.data) as any;
+    expect(cust.name).toBe('Test New');
+    expect(cust.credit_limit).toBe(5000);
+    expect(cust.price_tier).toBe('Retail');
+    expect(cust.is_vat_exempt).toBe(0);
+    expect(cust.is_active).toBe(1);
+  });
+
+  it('creates a wholesale vat-exempt customer', async () => {
+    const res = await createCustomer('Wholesale Cust', null, null, 10000, 'Wholesale', 1);
+    expect(res.success).toBe(true);
+
+    const cust = db.prepare("SELECT price_tier, is_vat_exempt FROM customers WHERE id = ?").get(res.data) as any;
+    expect(cust.price_tier).toBe('Wholesale');
+    expect(cust.is_vat_exempt).toBe(1);
+  });
+
+  it('rejects customer with empty name', async () => {
+    const res = await createCustomer('', null, null, 0, 'Retail', 0);
+    expect(res.success).toBe(false);
+  });
+
+  it('returns all active customers', async () => {
+    const pre = await getCustomers();
+    const beforeCount = pre.length;
+
+    await createCustomer('List Test', null, null, 0, 'Retail', 0);
+    await createCustomer('Another List', null, null, 0, 'Retail', 0);
+
+    const post = await getCustomers();
+    expect(post.length).toBe(beforeCount + 2);
+  });
+
+  it('soft-deletes a customer', async () => {
+    const createRes = await createCustomer('To Delete', null, null, 0, 'Retail', 0);
+    expect(createRes.success).toBe(true);
+
+    const delRes = await deactivateCustomer(createRes.data);
+    expect(delRes.success).toBe(true);
+
+    // Should no longer appear in active customers
+    const customers = await getCustomers();
+    expect(customers.find(c => c.id === createRes.data)).toBeUndefined();
+  });
+
+  it('rejects deactivation of non-existent customer', async () => {
+    const res = await deactivateCustomer(crypto.randomUUID());
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/not found/i);
+  });
+});
+
+describe('verifyAllCustomersIntegrity', () => {
+  it('reports clean for untampered customer ledgers', async () => {
+    const res = await verifyAllCustomersIntegrity();
+    expect(res.isCorrupt).toBe(false);
+    expect(res.tamperedList).toEqual([]);
+  });
+
+  it('reports tampered customer after ledger mutation', async () => {
+    // Create customer with a ledger entry via credit checkout
+    const custRes = await createCustomer('Integrity Test', null, null, 10000, 'Retail', 1);
+    const customerId = custRes.data;
+
+    const itemId = crypto.randomUUID();
+    db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active)
+      VALUES (?, 'Integrity Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
+
+    await processCheckout({
+      customerId, cashierId: 'system-daemon',
+      items: [{ itemId, name: 'Integrity Item', quantity: 1000, unitUsed: 'pc', unitPrice: 1000, unitCost: 500, totalPrice: 1000 }],
+      subtotal: 1000, tax: 0, deliveryFee: 0, discount: 0, totalAmount: 1000, amountPaid: 0, paymentMethod: 'Credit'
+    });
+
+    // Verify clean before tampering
+    const clean = await verifyAllCustomersIntegrity();
+    expect(clean.isCorrupt).toBe(false);
+
+    // Tamper the ledger entry
+    db.prepare(`UPDATE customer_ledger SET amount = 9999 WHERE customer_id = ?`).run(customerId);
+
+    // Verify corruption detected
+    const corrupt = await verifyAllCustomersIntegrity();
+    expect(corrupt.isCorrupt).toBe(true);
+    expect(corrupt.tamperedList.length).toBeGreaterThanOrEqual(1);
   });
 });

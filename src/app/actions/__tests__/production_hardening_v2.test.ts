@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import crypto from 'crypto';
 import db, { runMigrations } from '@/lib/db';
-import { getMlekSecret, setMlekSecret, checkMlek } from '@/lib/mlek';
+import { getMlekSecret, setMlekSecret } from '@/lib/mlek';
 import { processCheckout } from '../transactions';
 import { bootstrapStore } from '../unlock';
 import { validateAndRestoreBackup, exportEncryptedBackup } from '../backup';
@@ -105,14 +105,14 @@ describe('Production Hardening Phase 5 Tests', () => {
       const fixedTime = Date.now() - 60000;
       globalThis.mlekLastActivity = fixedTime;
 
-      // Call checkMlek in passive mode
-      checkMlek(false);
+      // Call getMlekSecret in passive mode
+      getMlekSecret(false);
 
       // Verify it did not change
       expect(globalThis.mlekLastActivity).toBe(fixedTime);
 
-      // Call checkMlek in active mode
-      checkMlek(true);
+      // Call getMlekSecret in active mode
+      getMlekSecret(true);
 
       // Verify it updated
       expect(globalThis.mlekLastActivity).not.toBe(fixedTime);
@@ -124,7 +124,7 @@ describe('Production Hardening Phase 5 Tests', () => {
     it('rejects backup restoration if integrity check fails', async () => {
       // Write corrupted ciphertext payload
       const badPayload = Buffer.from("corruptedpayload").toString('base64');
-      const res = await validateAndRestoreBackup(badPayload, 'test-user');
+      const res = await validateAndRestoreBackup(badPayload);
       expect(res.success).toBe(false);
     });
 
@@ -135,7 +135,7 @@ describe('Production Hardening Phase 5 Tests', () => {
       expect(exportRes.data).toBeDefined();
 
       // 2. Restore backup
-      const restoreRes = await validateAndRestoreBackup(exportRes.data!, 'system-daemon');
+      const restoreRes = await validateAndRestoreBackup(exportRes.data!);
       if (!restoreRes.success) {
         console.log("RESTORE ERROR DETAIL:", restoreRes.error);
       }

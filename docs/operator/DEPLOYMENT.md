@@ -47,10 +47,10 @@ Create a `.env.local` file in the project root:
 
 ```env
 SESSION_PASSWORD=your_secure_random_string_at_least_32_characters
-# Optional: Set to 'false' if running on a local LAN over unencrypted HTTP (no SSL) in production mode
+# Set to 'false' if running on a local LAN over unencrypted HTTP (no SSL) in production mode
 SESSION_SECURE=true
+# Set to 'true' if behind a reverse proxy — IP rate limiting reads X-Forwarded-For first hop
 TRUST_PROXY=true
-# Optional: Set to 'true' if behind a reverse proxy. When enabled, the first hop of X-Forwarded-For is used for rate-limiting. Default (unset or false): client IP always resolves to 127.0.0.1.
 ```
 
 > [!CAUTION]
@@ -184,25 +184,9 @@ The system enforces progressive lockout to prevent brute-force attacks:
 > [!NOTE]
 > Rate limiting state is held in-memory and resets on server restart. Persistent attackers on a LAN should be addressed at the network level.
 >
-> The client IP is resolved server-side via resolveClientIp() — never from a client-supplied argument. In LAN mode (default), all clients appear as 127.0.0.1, so IP-based rate limiting applies per-device only behind a reverse proxy with TRUST_PROXY=true.
+> Client IP always resolves to `127.0.0.1` (single-machine deployment). Set `TRUST_PROXY=true` behind a reverse proxy for proper per-device IP rate limiting.
 
 ---
-
-## 6. PWA & Offline Access
-
-The application is a fully installable **Progressive Web App (PWA)**, designed for use on tablets and dedicated POS devices.
-
-| Feature | Implementation |
-|---------|---------------|
-| **Installability** | `manifest.json` with `"display": "standalone"`, app icons (192×192, 512×512) |
-| **Offline caching** | Service worker (`public/sw.js`) with a network-first strategy — successful responses are cached; cached versions are served when the network is unavailable |
-| **Cached resources** | Root page (`/`), manifest, and all subsequently fetched static assets |
-
-### Installing on a Device
-
-1. Open `http://<host-ip>:3000` in Chrome or Edge on the target device.
-2. Tap the browser's **"Install App"** or **"Add to Home Screen"** prompt.
-3. The app launches in standalone mode (no browser chrome) on subsequent opens.
 
 ---
 

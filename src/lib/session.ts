@@ -28,6 +28,7 @@ export const sessionOptions: SessionOptions = {
   password: sessionPassword,
   cookieName: 'construction_erp_session',
   cookieOptions: {
+    httpOnly: true,
     secure: process.env.SESSION_SECURE === 'true' || (process.env.NODE_ENV === 'production' && process.env.SESSION_SECURE !== 'false'),
     sameSite: 'lax',
   },

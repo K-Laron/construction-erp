@@ -1,11 +1,10 @@
 "use client";
-import { SkeletonTable } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { BarChart3, TrendingUp, DollarSign, Users, Package, Loader2 } from 'lucide-react';
-import { getTrialBalance, runHeavyAuditReport } from '@/app/actions/ledger';
+import { getTrialBalance, getTodaySales, getTodayCollections } from '@/app/actions/ledger';
 import { getInventory } from '@/app/actions/inventory';
 import { getCustomers } from '@/app/actions/customers';
 import { formatCurrency } from '@/lib/format';
@@ -47,13 +46,8 @@ export default function ReportsPanel() {
         // Calculate total inventory cost value
         const totalInvCost = invData.reduce((sum, item) => sum + Math.round((item.stock_quantity * item.cost_price) / 1000), 0);
 
-        // Fetch today's sales from ledger worker query
-        const todaySalesRaw = await runHeavyAuditReport('TODAY_SALES');
-        const todaySales = todaySalesRaw[0]?.total || 0;
-
-        // Fetch today's cash collections
-        const todayCollectionsRaw = await runHeavyAuditReport('TODAY_COLLECTIONS');
-        const todayCollections = todayCollectionsRaw[0]?.total || 0;
+        const todaySales = await getTodaySales();
+        const todayCollections = await getTodayCollections();
 
         setTotals({
           todaySales,

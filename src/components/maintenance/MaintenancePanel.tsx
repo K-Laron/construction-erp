@@ -63,7 +63,7 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
     setFormError('');
     setFormLoading(true);
     try {
-      const res = await createUser(currentUser.id, username, name, role, pin);
+      const res = await createUser(username, name, role, pin);
       if (!res.success) {
         setFormError(res.error || 'Failed to create user.');
         setFormLoading(false);

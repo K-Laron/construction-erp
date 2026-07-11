@@ -30,10 +30,6 @@ export function isStoreConfigured(): boolean {
   }
 }
 
-export function isStoreUnlocked(): boolean {
-  return isMlekUnlocked();
-}
-
 export function lockStore(): void {
   if (isMlekUnlocked()) {
     try {

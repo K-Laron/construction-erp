@@ -3,7 +3,7 @@
 import db from '@/lib/db';
 import crypto from 'crypto';
 import { getActiveUserId, requireAuth } from './auth';
-import { checkMlek } from "@/lib/mlek";
+import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
 
 const DispatchDeliverySchema = z.object({
@@ -21,7 +21,7 @@ const DispatchDeliverySchema = z.object({
 // Fetch pending deliveries
 export async function getPendingDeliveries(): Promise<{ transaction_id: string, date: string, delivery_status: string, customer_name: string | null, customer_id: string | null, total_amount: number }[]> {
   await requireAuth();
-  checkMlek(false);
+  getMlekSecret(false);
   return db.prepare(`
     SELECT t.id as transaction_id, t.date, t.delivery_status,
            c.name as customer_name, c.id as customer_id,
@@ -36,7 +36,7 @@ export async function getPendingDeliveries(): Promise<{ transaction_id: string, 
 // Fetch items remaining for a transaction
 export async function getDeliveryRemainingItems(transactionId: string): Promise<{ item_id: string, item_name: string, unit: string, ordered_qty: number, delivered_qty: number, remaining_qty: number }[]> {
   await requireAuth();
-  checkMlek(false);
+  getMlekSecret(false);
 
   return db.prepare(`
     WITH cte AS (
@@ -74,7 +74,7 @@ export async function dispatchDelivery(
       items,
       helperWorkerIds
     });
-    checkMlek();
+    getMlekSecret();
     const userId = await requireAuth();
 
     const deliveryId = crypto.randomUUID();
@@ -166,7 +166,7 @@ export async function dispatchDelivery(
 // Confirm delivery completion
 export async function confirmDelivery(deliveryId: string): Promise<void> {
   const userId = await requireAuth();
-  checkMlek();
+  getMlekSecret();
   db.prepare("UPDATE deliveries SET status = 'Delivered' WHERE id = ?").run(deliveryId);
   db.prepare(`
     INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
@@ -177,7 +177,7 @@ export async function confirmDelivery(deliveryId: string): Promise<void> {
 // Get delivery history for a transaction
 export async function getDeliveryHistory(transactionId: string): Promise<{ id: string, transaction_id: string, delivery_date: string, driver_name: string, truck_plate: string, status: string, items: { id: string; delivery_id: string; item_id: string; quantity_delivered: number; item_name: string; unit: string }[] }[]> {
   await requireAuth();
-  checkMlek();
+  getMlekSecret();
   const deliveries = db.prepare(`
     SELECT * FROM deliveries WHERE transaction_id = ? ORDER BY delivery_date DESC
   `).all(transactionId) as { id: string, transaction_id: string, delivery_date: string, driver_name: string, truck_plate: string, status: string }[];

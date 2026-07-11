@@ -29,7 +29,7 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
   useEffect(() => {
     async function loadShift() {
       try {
-        const shift = await getCurrentShift(cashierId);
+        const shift = await getCurrentShift();
         if (shift) {
           setCurrentShiftId(shift.id);
           setOpenTime(shift.opened_at);
@@ -48,7 +48,7 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
     setLoading(true);
     try {
       const floatCentavos = parsePesoCentavos(openingFloatStr);
-      const result = await openShift(cashierId, floatCentavos);
+      const result = await openShift(floatCentavos);
       if (!result.success) throw new Error(result.error);
       const shiftId = result.data!;
       setCurrentShiftId(shiftId);

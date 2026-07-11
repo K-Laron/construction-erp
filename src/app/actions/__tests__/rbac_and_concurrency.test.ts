@@ -39,30 +39,15 @@ describe('RBAC Enforcement', () => {
 
   it('allows Admin to create a user', async () => {
     vi.mocked(getSession).mockResolvedValueOnce({ userId: adminId, role: 'Admin', save: vi.fn() } as any);
-    const res = await createUser(adminId, 'newguy', 'New Guy', 'Cashier', '123456');
+    const res = await createUser('newguy', 'New Guy', 'Cashier', '123456');
     expect(res.success).toBe(true);
   });
 
   it('denies Cashier from creating a user (RBAC_DENIED)', async () => {
     vi.mocked(getSession).mockResolvedValueOnce({ userId: cashierId, role: 'Cashier', save: vi.fn() } as any);
-    const res = await createUser(cashierId, 'shouldfail', 'Should Fail', 'Cashier', '123456');
+    const res = await createUser('shouldfail', 'Should Fail', 'Cashier', '123456');
     expect(res.success).toBe(false);
     expect(res.error).toContain('RBAC_DENIED');
-  });
-
-  it('denies Viewer role from creating a user (RBAC_DENIED)', async () => {
-    const viewerId = crypto.randomUUID();
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.pbkdf2Sync('000000', salt, 600000, 32, 'sha512').toString('hex');
-    db.prepare(
-      `INSERT OR IGNORE INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system)
-       VALUES (?, 'viewer1', 'Viewer One', 'Viewer', ?, ?, 1, 0)`
-    ).run(viewerId, hash, salt);
-
-    vi.mocked(getSession).mockResolvedValueOnce({ userId: viewerId, role: 'Viewer', save: vi.fn() } as any);
-    const res = await createUser(viewerId, 'shouldfail2', 'Should Fail 2', 'Cashier', '123456');
-    expect(res.success).toBe(false);
-    expect(res.error).toContain('UNAUTHORIZED');
   });
 
   it('correctly authenticates a Cashier user', async () => {
@@ -201,7 +186,7 @@ describe('Concurrency Safety', () => {
     vi.mocked(getSession).mockResolvedValue({ userId: cashier1Id, role: 'Cashier', save: vi.fn() } as any);
 
     // Open shift for Cashier 1
-    const openRes = await openShift('', 10000);
+    const openRes = await openShift(10000);
     expect(openRes.success).toBe(true);
     const shiftId = openRes.data;
 

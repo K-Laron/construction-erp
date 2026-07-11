@@ -1,10 +1,9 @@
 "use server";
 
 import db, { runMigrations } from '@/lib/db';
-import { deriveKey, encryptField, decryptField } from '@/lib/crypto';
+import { encryptField, decryptField } from '@/lib/crypto';
 import crypto from 'crypto';
 import { setMlekSecret, isMlekUnlocked } from "@/lib/mlek";
-import { resolveClientIp } from '@/lib/client_ip';
 
 export interface UnlockResult {
   success: boolean;
@@ -58,8 +57,8 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
     const mmpSalt = crypto.randomBytes(16).toString('hex');
 
     // Derive keys
-    const dopKey = await deriveKey(dop, dopSalt, 100000);
-    const mmpKey = await deriveKey(mmp, mmpSalt, 600000);
+    const dopKey = crypto.pbkdf2Sync(dop, dopSalt, 100000, 32, 'sha512');
+    const mmpKey = crypto.pbkdf2Sync(mmp, mmpSalt, 600000, 32, 'sha512');
 
     // Encrypt MLEK under DOP and MMP
     const mlekHex = mlek.toString('hex');
@@ -98,7 +97,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
 
 // Unlock the database using the DOP passphrase
 export async function unlockStore(dop: string): Promise<UnlockResult> {
-  const ipAddress = await resolveClientIp();
+  const ipAddress = '127.0.0.1';
 
   const isFirst = await checkFirstBoot();
   if (isFirst) {
@@ -123,7 +122,7 @@ export async function unlockStore(dop: string): Promise<UnlockResult> {
     const dopConfig = db.prepare("SELECT value FROM system_config WHERE key = 'mlek_encrypted_dop'").get() as { value: string };
     const dopSalt = db.prepare("SELECT value FROM system_config WHERE key = 'dop_salt'").get() as { value: string };
 
-    const derivedKey = await deriveKey(dop, dopSalt.value, 100000);
+    const derivedKey = crypto.pbkdf2Sync(dop, dopSalt.value, 100000, 32, 'sha512');
     const decryptedMlek = decryptField(dopConfig.value, derivedKey);
 
     // Save decrypted key in server memory
@@ -157,7 +156,7 @@ export async function unlockStore(dop: string): Promise<UnlockResult> {
 
 // Disaster Recovery using the 12-word MMP recovery mnemonic
 export async function recoverStore(mnemonicWords: string[], newDop: string): Promise<UnlockResult> {
-  const ipAddress = await resolveClientIp();
+  const ipAddress = '127.0.0.1';
 
   if (mnemonicWords.length !== 12) {
     return { success: false, error: "Disaster recovery mnemonic must be exactly 12 words." };
@@ -188,12 +187,12 @@ export async function recoverStore(mnemonicWords: string[], newDop: string): Pro
     const mmpConfig = db.prepare("SELECT value FROM system_config WHERE key = 'mlek_encrypted_mmp'").get() as { value: string };
     const mmpSalt = db.prepare("SELECT value FROM system_config WHERE key = 'mmp_salt'").get() as { value: string };
 
-    const derivedMmpKey = await deriveKey(mmp, mmpSalt.value, 600000);
+    const derivedMmpKey = crypto.pbkdf2Sync(mmp, mmpSalt.value, 600000, 32, 'sha512');
     const decryptedMlek = decryptField(mmpConfig.value, derivedMmpKey);
 
     // Decryption succeeded! Update the DOP
     const newDopSalt = crypto.randomBytes(16).toString('hex');
-    const derivedDopKey = await deriveKey(newDop, newDopSalt, 100000);
+    const derivedDopKey = crypto.pbkdf2Sync(newDop, newDopSalt, 100000, 32, 'sha512');
     const encryptedDop = encryptField(decryptedMlek, derivedDopKey);
 
     db.transaction(() => {

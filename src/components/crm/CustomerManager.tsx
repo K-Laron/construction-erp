@@ -1,5 +1,5 @@
 "use client";
-import { SkeletonTable } from "@/components/ui/Skeleton";
+import { SkeletonLine } from "@/components/ui/Skeleton";
 
 import { useState, useEffect, Fragment } from 'react';
 import { logger } from "@/lib/logger";
@@ -95,7 +95,7 @@ export default function CustomerManager() {
       </div>
 
       {loading ? (
-        <SkeletonTable rows={5} cols={6} />
+        <SkeletonLine className="w-full h-48" />
       ) : (
         <div className="border border-surface-800 rounded-xl overflow-hidden bg-surface-950/40">
           <table className="w-full text-left text-xs border-collapse">

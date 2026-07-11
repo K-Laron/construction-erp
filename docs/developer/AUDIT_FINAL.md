@@ -13,7 +13,7 @@ This document records every finding identified during the multi-phase security a
 
 | Metric | Status |
 |---|---|
-| Test Suites | **13 suites, 41 tests — ALL PASSING** ✅ |
+| Test Suites | **16 suites, 103 tests — ALL PASSING** ✅ |
 | TypeScript | **`tsc --noEmit` — CLEAN** ✅ |
 | ESLint | **Configured and passing** ✅ |
 | Hardcoded Credentials | **Zero** ✅ |
@@ -105,7 +105,7 @@ This document records every finding identified during the multi-phase security a
 | L2 | 6 | **`@ts-ignore` for `__webpack_require__`** — suppressed compiler error without explanation | Addressed (webpack-specific intrinsic handled properly) | ✅ |
 | L3 | 6 | **Row spread leaks encrypted fields** — spreading a DB row into a response object could expose cipher-text columns | Explicit field mapping applied in `customers.ts` | ✅ |
 | L4 | 6 | **No component tests** — zero front-end test coverage | Tests added for `PaymentModal`, `POSRegister`, and `CheckoutModal` | ✅ |
-| L6 | 6 | **No PWA support** — application not installable on devices | `manifest.json`, `sw.js`, and `PWA.tsx` component added | ✅ |
+| L6 | 6 | **No PWA support** — application not installable on devices | `manifest.json`, `sw.js`, and `PWA.tsx` component added. Later removed (PWA not needed for LAN terminal) | ✅ |
 
 ---
 
@@ -159,7 +159,7 @@ This document records every finding identified during the multi-phase security a
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  11 test suites · 29 tests · ALL PASSING             │
+│  16 test suites · 103 tests · ALL PASSING            │
 │  TypeScript: CLEAN (tsc --noEmit)                    │
 │  ESLint: CLEAN                                       │
 │  Known security vulnerabilities: 0                   │

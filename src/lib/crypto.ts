@@ -1,19 +1,5 @@
 import crypto from 'crypto';
 
-// Cryptographic configuration parameters
-export const DOP_ITERATIONS = 100000;
-export const MMP_ITERATIONS = 600000;
-export const HASH_LENGTH = 32; // 256 bits for AES-256
-
-export function deriveKey(passphrase: string, salt: string, iterations: number): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    crypto.pbkdf2(passphrase, salt, iterations, HASH_LENGTH, 'sha512', (err, key) => {
-      if (err) reject(err);
-      else resolve(key);
-    });
-  });
-}
-
 // AES-256-GCM Column-level Encryption
 export function encryptField(plaintext: string, key: Buffer): string {
   const iv = crypto.randomBytes(12);

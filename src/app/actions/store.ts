@@ -1,6 +1,7 @@
 "use server";
 
-import { initializeDatabase, isStoreConfigured, isStoreUnlocked, lockStore } from '@/lib/init';
+import { initializeDatabase, isStoreConfigured, lockStore } from '@/lib/init';
+import { isMlekUnlocked } from '@/lib/mlek';
 import { requireAuth } from './auth';
 
 // Initialize database on first server action call
@@ -12,7 +13,7 @@ export async function getStoreStatus(): Promise<{ isConfigured: boolean; isUnloc
   await initializeDatabase();
   return {
     isConfigured: isStoreConfigured(),
-    isUnlocked: isStoreUnlocked()
+    isUnlocked: isMlekUnlocked()
   };
 }
 

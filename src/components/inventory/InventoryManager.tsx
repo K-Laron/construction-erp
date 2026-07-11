@@ -1,5 +1,5 @@
 "use client";
-import { SkeletonTable } from "@/components/ui/Skeleton";
+import { SkeletonLine } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
 import { logger } from "@/lib/logger";
@@ -86,7 +86,7 @@ export default function InventoryManager() {
       </div>
 
       {loading ? (
-        <SkeletonTable rows={5} cols={4} />
+        <SkeletonLine className="w-full h-48" />
       ) : filteredItems.length === 0 ? (
         <div className="border border-surface-800 rounded-xl p-12 text-center text-interactive-400 text-sm">
           No inventory products found matching filters.

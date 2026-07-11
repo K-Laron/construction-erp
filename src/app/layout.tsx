@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Fira_Sans, Fira_Code } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
-import { PWA } from "@/components/ui/PWA";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 
 const firaSans = Fira_Sans({
@@ -46,7 +45,6 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <PWA />
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>
