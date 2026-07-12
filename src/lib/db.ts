@@ -27,7 +27,7 @@ activeDb.pragma('synchronous = NORMAL');
 activeDb.pragma('busy_timeout = 10000');
 activeDb.pragma('foreign_keys = ON');
 
-export function swapDatabase(tempRestorePath: string) {
+export async function swapDatabase(tempRestorePath: string, mlekSecret?: string) {
   activeDb.close();
   if (dbPath !== ':memory:') {
     fs.copyFileSync(tempRestorePath, dbPath);
@@ -42,6 +42,8 @@ export function swapDatabase(tempRestorePath: string) {
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
     globalThis.dbInstance = activeDb;
   }
+  // Run pending migrations so restored DB gets schema updates
+  await runMigrations(mlekSecret);
 }
 
 const dbProxy = new Proxy({} as DatabaseType, {
@@ -178,7 +180,7 @@ function shutdown(signal: string) {
   logger.info(`Received ${signal}. Closing database...`);
   try { db.close(); } catch { /* already closed */ }
   logger.info('Database closed. Goodbye.');
-  process.exit(0);
+  process.exitCode = 0;
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));

@@ -314,7 +314,7 @@ export async function processCheckout(rawPayload: CheckoutPayload): Promise<{ su
 }
 
 // Fetch all transactions for a date range
-export async function getTransactions(startDate?: string, endDate?: string): Promise<Transaction[]> {
+export async function getTransactions(startDate?: string, endDate?: string, limit = 100, offset = 0): Promise<Transaction[]> {
   await requireAuth();
   getMlekSecret(false);
   let query = "SELECT * FROM transactions";
@@ -324,7 +324,8 @@ export async function getTransactions(startDate?: string, endDate?: string): Pro
     query += " WHERE date BETWEEN ? AND ?";
     params.push(startDate, endDate);
   }
-  query += " ORDER BY date DESC";
+  query += " ORDER BY date DESC LIMIT ? OFFSET ?";
+  params.push(String(limit), String(offset));
 
   return db.prepare(query).all(...params) as Transaction[];
 }

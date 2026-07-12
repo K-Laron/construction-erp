@@ -9,6 +9,7 @@ import Database from 'better-sqlite3';
 import { getMlekSecret } from "@/lib/mlek";
 import { logger } from '@/lib/logger';
 import { requireAuth } from './auth';
+import { getClientIP } from '@/lib/request';
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 300000; // 5 min
@@ -63,7 +64,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     return { success: false, error: "Store is locked." };
   }
 
-  const ipAddress = '127.0.0.1';
+  const ipAddress = await getClientIP();
 
   if (!checkRateLimit(ipAddress)) {
     return { success: false, error: "Rate limit exceeded. Try again in 5 minutes." };
@@ -108,7 +109,7 @@ export async function exportEncryptedBackup(): Promise<{ success: boolean; data?
     return {
       success: true,
       data: finalPayload.toString('base64'),
-      filename: `backup_${new Date().toISOString().slice(0, 10)}.enc`
+      filename: `backup_${new Date().toISOString().slice(0, 10)}_${crypto.randomUUID().slice(0, 8)}.enc`
     };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -164,7 +165,7 @@ export async function validateAndRestoreBackup(base64Payload: string): Promise<{
     }
 
     // Safely close connection, copy tempRestorePath to replace database, and reopen connection
-    swapDatabase(tempRestorePath);
+    await swapDatabase(tempRestorePath, secret.toString("hex"));
 
     // Audit log
     db.prepare(`

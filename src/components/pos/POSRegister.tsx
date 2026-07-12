@@ -12,7 +12,7 @@ import CheckoutModal from './CheckoutModal';
 
 interface POSRegisterProps {
   cashierId: string;
-  onCheckoutSuccess: (txn: any) => void;
+  onCheckoutSuccess: (txn: { transactionId: string; siNumber: number | null; orNumber: number | null; payload: any; customerName?: string }) => void;
 }
 
 export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegisterProps) {

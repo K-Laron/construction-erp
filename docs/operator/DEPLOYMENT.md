@@ -184,7 +184,7 @@ The system enforces progressive lockout to prevent brute-force attacks:
 > [!NOTE]
 > Rate limiting state is held in-memory and resets on server restart. Persistent attackers on a LAN should be addressed at the network level.
 >
-> Client IP always resolves to `127.0.0.1` (single-machine deployment). Set `TRUST_PROXY=true` behind a reverse proxy for proper per-device IP rate limiting.
+> By default all clients resolve to `127.0.0.1` (single-machine LAN deployment). Set `TRUST_PROXY=true` and ensure your reverse proxy forwards `X-Forwarded-For` for per-device IP rate limiting.
 
 ---
 
@@ -207,7 +207,7 @@ Backups are created via the Maintenance Panel or scheduled cron jobs:
 2. A **backup-specific encryption key** is derived from the MLEK using **PBKDF2-SHA256** with 100,000 iterations and a dedicated salt — the raw MLEK is never used directly as an AES key.
 3. The snapshot is encrypted with **AES-256-GCM** (12-byte IV, 16-byte authentication tag).
 4. The final payload is structured as: `IV (12 B) || Auth Tag (16 B) || Ciphertext`.
-5. The payload is Base64-encoded and delivered to the client as `backup_YYYY-MM-DD.enc`.
+5. The payload is Base64-encoded and delivered to the client as `backup_YYYY-MM-DD_<uuid>.enc` (UUID prefix prevents filename collisions).
 
 > [!IMPORTANT]
 > **Temporary file hygiene:** Unencrypted backup snapshots are written to `os.tmpdir()` with UUID-based filenames and are unconditionally deleted in a `finally` block, regardless of encryption success or failure. If cleanup fails, a `CRITICAL` log entry is emitted.
@@ -226,7 +226,28 @@ In the event of host machine failure or data corruption:
 
 ---
 
-## 8. Database Migrations
+## 8. Health Check
+
+The system exposes a health check endpoint for monitoring and container orchestration:
+
+```
+GET /api/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-07-12T10:00:00.000Z",
+  "db": "connected"
+}
+```
+
+Returns HTTP 503 when the database is unreachable.
+
+---
+
+## 9. Database Migrations
 
 ### SQL Schema Migrations
 
@@ -249,7 +270,7 @@ Some migrations require access to decrypted data (e.g., re-encrypting fields und
 
 ---
 
-## 9. Security Summary
+## 10. Security Summary
 
 ### 9.1 Credential Management
 

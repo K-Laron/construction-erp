@@ -18,7 +18,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 export default function Home() {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [isUnlocked, setIsUnlocked] = useState<boolean | null>(null);
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string; name: string; role: string } | null>(null);
 
   const [activeView, setActiveView] = useState('pos');
   const [activeShiftId, setActiveShiftId] = useState<string | null>(null);

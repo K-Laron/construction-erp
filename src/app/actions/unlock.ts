@@ -1,4 +1,5 @@
 "use server";
+import { getClientIP } from '@/lib/request';
 
 import db, { runMigrations } from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
@@ -97,7 +98,7 @@ export async function bootstrapStore(dop: string, mmpWords: string[]): Promise<U
 
 // Unlock the database using the DOP passphrase
 export async function unlockStore(dop: string): Promise<UnlockResult> {
-  const ipAddress = '127.0.0.1';
+  const ipAddress = await getClientIP();
 
   const isFirst = await checkFirstBoot();
   if (isFirst) {
@@ -156,7 +157,7 @@ export async function unlockStore(dop: string): Promise<UnlockResult> {
 
 // Disaster Recovery using the 12-word MMP recovery mnemonic
 export async function recoverStore(mnemonicWords: string[], newDop: string): Promise<UnlockResult> {
-  const ipAddress = '127.0.0.1';
+  const ipAddress = await getClientIP();
 
   if (mnemonicWords.length !== 12) {
     return { success: false, error: "Disaster recovery mnemonic must be exactly 12 words." };

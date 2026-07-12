@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { getSession } from '@/lib/session';
 import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
+import { getClientIP } from '@/lib/request';
 
 const CreateUserSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters long"),
@@ -57,7 +58,7 @@ export async function logoutUser(): Promise<{ success: boolean }> {
 
 // Authenticate user via PIN
 export async function authenticateUser(username: string, pin: string): Promise<{ success: boolean; user?: { id: string; username: string; name: string; role: string; }; error?: string }> {
-  const ipAddress = '127.0.0.1';
+  const ipAddress = await getClientIP();
 
   const timeframe5Min = Date.now() - 300000;
   const timeframe15Min = Date.now() - 900000;

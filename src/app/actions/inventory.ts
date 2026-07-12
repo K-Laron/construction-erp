@@ -25,7 +25,7 @@ const CreateSupplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
   contactPerson: z.string().nullable(),
   phone: z.string().nullable(),
-  email: z.string().email().nullable().or(z.literal("")).or(z.null())
+  email: z.string().email().nullable().or(z.literal(""))
 });
 
 // Fetch active inventory (values in millicounts/centavos)
@@ -163,8 +163,8 @@ export async function deactivateSupplier(id: string): Promise<{ success: boolean
     const info = db.prepare("UPDATE suppliers SET is_active = 0 WHERE id = ?").run(parsed.id);
     if (info.changes === 0) throw new Error("Supplier not found");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to deactivate supplier." };
   }
 }
 
@@ -371,7 +371,10 @@ export async function recordSupplierPayment(
       if (!sup) {
         throw new Error('SUPPLIER_NOT_FOUND: Supplier does not exist.');
       }
-      // Overpayments are allowed to support credit balances
+      const OVERPAYMENT_TOLERANCE = 0; // centavos; tune per-instance if rounding differences arise
+      if (parsed.amount > sup.current_balance + OVERPAYMENT_TOLERANCE) {
+        throw new Error(`OVERPAYMENT_EXCEEDS_BALANCE: Payment ${parsed.amount} > balance ${sup.current_balance} (tolerance ${OVERPAYMENT_TOLERANCE}).`);
+      }
 
       // 1. Update supplier current balance (decrease outstanding Accounts Payable)
       db.prepare(`

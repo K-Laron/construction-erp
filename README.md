@@ -15,7 +15,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
 | Fonts       | Fira Sans (body), Fira Code (heading/mono)
-| Testing     | Vitest (16 suites, 103 tests)        |
+| Testing     | Vitest (16 suites, 102 tests)        |
 | Logging     | Structured logger (JSON, level-filtered)  |
 
 ## Features
@@ -35,8 +35,9 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 - **High-contrast daylight readability** — Data-dense dashboard with light/dark mode, optimized for outdoor/warehouse environments
 - **A6 portrait print engine** — Receipt generation for thermal and standard printers (1/4 A4 size)
 - **Structured error handling** — All server actions return `{ success, data, error }`; `ErrorBoundary` component for UI crash isolation
-- **Graceful shutdown** — SIGTERM/SIGINT handler ensures clean DB closure
+- **Graceful shutdown** — SIGTERM/SIGINT handler ensures clean DB closure (exit code, not process kill)
 - **Production Logging** — Outputs single-line JSON log strings with dynamic trace correlation ID extraction
+- **Health endpoint** — `GET /api/health` returns DB and server status for monitoring and load balancer probes
 
 ## Security
 
@@ -50,7 +51,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 - **Cryptographically random admin PIN** generated on bootstrap (no hardcoded credentials)
 - **Cryptographically secure PRNG** for recovery mnemonic generation (`crypto.getRandomValues` instead of `Math.random`)
 - **System daemon** seeded with a random unreachable hash
-- **Rate-limited authentication** with IP and account lockouts (transactional)
+- **Rate-limited authentication** with IP and account lockouts (transactional) — set `TRUST_PROXY=true` behind a reverse proxy for per-device rate limiting
 - **Session cookies** via iron-session with enforced production password
 - **MLEK Inactivity Auto-Lock** — Decrypted master ledger key zero-filled and evicted from process memory after 30 minutes of inactivity
 - **Zod Validation Boundaries** — All mutating server actions strictly validate input types and constraints prior to execution
@@ -88,6 +89,7 @@ src/
 │   ├── ledger_helpers  # HMAC-SHA256 chaining + ledger utilities
 │   ├── logger          # Structured logger
 │   ├── mlek            # Master Ledger Encryption Key
+│   ├── request         # Client IP extraction (TRUST_PROXY-aware)
 │   ├── session         # iron-session management
 │
 ├── components/         # 19 components
@@ -113,7 +115,7 @@ src/
 
 ## Testing
 
-**16 test suites · 103 tests · all passing · tsc --noEmit clean**
+**16 test suites · 103 tests passing · tsc --noEmit clean (source)**
 
 All tests run against in-memory SQLite with the full migration suite applied.
 

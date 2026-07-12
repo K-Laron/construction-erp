@@ -165,6 +165,25 @@ This document records every finding identified during the multi-phase security a
 
 ---
 
+---
+
+## Phase 13: Production Fixes (Post-Audit Remediation — July 2026)
+
+| Area | Finding | Resolution | Status |
+|---|---|---|---|
+| Security / Rate Limiting | IP rate limiting was non-functional — `127.0.0.1` hardcoded at 4 call sites | Created `src/lib/request.ts` with TRUST_PROXY-aware `getClientIP()` helper; wired into auth, unlock, backup actions | ✅ |
+| Backup / Migrations | `swapDatabase` did not re-run migrations after restore — schema mismatch risk | `swapDatabase` now accepts optional `mlekSecret` param and calls `runMigrations` after swap | ✅ |
+| Backup | Backup filenames could collide (date-only) | Filename now includes UUID: `backup_YYYY-MM-DD_<uuid>.enc` | ✅ |
+| Operations | No health endpoint for monitoring | Added `GET /api/health` returning status, timestamp, DB connectivity | ✅ |
+| Operations | `process.exit(0)` could interrupt in-flight responses | Replaced with `process.exitCode = 0` — pending work drains naturally | ✅ |
+| Operations | `getTransactions` returned unbounded result sets | Added `LIMIT ? OFFSET ?` with defaults (100, 0); call sites unchanged | ✅ |
+| Code Quality | `catch (err: any)` in inventory.ts | Standardized to `unknown` with `instanceof Error` narrowing | ✅ |
+| Code Quality | Zod schema redundancy | Removed duplicate `.or(z.null())` on nullable field | ✅ |
+| Code Quality | Loose `any` types in components | POSRegister, page.tsx now use typed callback signatures | ✅ |
+| Cleanup | 9 dev fix/refactor scripts in project root | Deleted | ✅ |
+
+---
+
 ## Final State Summary
 
 ```
@@ -180,7 +199,7 @@ This document records every finding identified during the multi-phase security a
 ```
 
 > [!IMPORTANT]
-> All **2 critical**, **15 high**, **14 medium**, and **27+ low/refactor** findings have been resolved. No open items remain.
+> All **3 critical**, **16 high**, **18 medium**, and **35+ low/refactor** findings have been resolved. No open items remain.
 
 ---
 
@@ -197,7 +216,8 @@ This document records every finding identified during the multi-phase security a
 | 10 (Concurrency) | 0 | 2 | 2 | 2 | 6 |
 | 11 (Auto-lock/Crypt) | 0 | 2 | 1 | 1 | 4 |
 | 12 (Phase 11 remediation) | 1 | 1 | 3 | 3 | 8 |
-| **Total** | **3** | **16** | **17** | **31** | **67** |
+| 13 (Post-audit fixes) | 0 | 0 | 1 | 4 | 5 |
+| **Total** | **3** | **16** | **18** | **35** | **72** |
 
 ---
 

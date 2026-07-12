@@ -26,7 +26,7 @@ To support multi-device operations on a local area network (LAN) safely without 
 - **Single DB Worker Pattern**: No client devices touch the SQLite file directly over network shares. All interactions are routed as HTTP requests to Next.js Server Actions on the host computer.
 - **IP Detection & Proxy Configuration (Default-Deny)**:
    - **Default-Deny Rule**: By default, the Next.js server resolves client IP addresses to `127.0.0.1` via `resolveClientIp()`. No client-supplied IP argument is ever accepted by server actions.
-   - **Trusted Proxy Switch**: The shared `src/lib/client_ip.ts` helper checks `TRUST_PROXY=true` env var. When enabled, the first hop of `X-Forwarded-For` is used for rate-limiting. When disabled (default LAN mode), all clients resolve to `127.0.0.1`.
+   - **Trusted Proxy Switch**: The shared `src/lib/request.ts` helper (`getClientIP()`) checks `TRUST_PROXY=true` env var. When enabled, the first hop of `X-Forwarded-For` is used for rate-limiting. When disabled (default LAN mode), all clients resolve to `127.0.0.1`.
 
 ### SQLite Concurrency & Event Loop Management
 - **WAL Concurrency Tuning**: SQLite is initialized in Write-Ahead Logging (WAL) mode with a busy timeout buffer to handle concurrent writes:
