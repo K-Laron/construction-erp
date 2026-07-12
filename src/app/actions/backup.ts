@@ -169,7 +169,7 @@ export async function validateAndRestoreBackup(base64Payload: string): Promise<{
     // Audit log
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, ?, 'BACKUP_IMPORT', ?, ?, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'BACKUP_IMPORT', ?, ?, ?)
     `).run(crypto.randomUUID(), performedByUserId, 'RESTORE', 'OK', 'OK');
 
     return { success: true };

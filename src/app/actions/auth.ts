@@ -147,7 +147,7 @@ export async function createUser(
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, ?, 'USER_CREATED', ?, NULL, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'USER_CREATED', ?, NULL, ?)
     `).run(crypto.randomUUID(), createdBy, userId, `User ${parsed.username} created as ${parsed.role}`);
 
     return { success: true, data: userId };
@@ -176,7 +176,7 @@ export async function updateCostPrice(itemId: string, newCostCentavos: number): 
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, ?, 'COST_PRICE_CHANGE', ?, ?, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'COST_PRICE_CHANGE', ?, ?, ?)
     `).run(crypto.randomUUID(), userId, parsed.itemId, String(old.cost_price), String(parsed.newCostCentavos));
 
     return { success: true };
@@ -199,7 +199,7 @@ export async function overrideCreditLimit(customerId: string, newLimitCentavos: 
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, ?, 'CREDIT_LIMIT_OVERRIDE', ?, ?, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'CREDIT_LIMIT_OVERRIDE', ?, ?, ?)
     `).run(crypto.randomUUID(), userId, parsed.customerId, String(old.credit_limit), String(parsed.newLimitCentavos));
 
     return { success: true };

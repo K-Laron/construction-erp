@@ -26,7 +26,7 @@ describe('Deliveries API', () => {
 
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES ('user_1', 'admin', 'Admin', 'Admin', 'hash', 'salt', 1, 0)`).run();
     db.prepare(`INSERT INTO users (id, username, name, role, passcode_hash, passcode_salt, is_active, is_system) VALUES ('system-daemon', 'daemon', 'Daemon', 'Admin', 'hash', 'salt', 1, 1)`).run();
-    db.prepare(`INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status) VALUES ('shift_1', 'user_1', CURRENT_TIMESTAMP, 0, 'Open')`).run();
+    db.prepare(`INSERT INTO shifts (id, cashier_id, opened_at, opening_float, status) VALUES ('shift_1', 'user_1', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, 'Open')`).run();
 
     transactionId = crypto.randomUUID();
     itemId = crypto.randomUUID();
@@ -38,7 +38,7 @@ describe('Deliveries API', () => {
 
     db.prepare(`
       INSERT INTO transactions (id, cashier_id, date, subtotal, tax, delivery_fee, discount, total_amount, amount_paid, balance_due, payment_status, payment_method, delivery_status)
-      VALUES (?, 'user_1', CURRENT_TIMESTAMP, 8000, 0, 0, 0, 8000, 8000, 0, 'Paid', 'Cash', 'Pending')
+      VALUES (?, 'user_1', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 8000, 0, 0, 0, 8000, 8000, 0, 'Paid', 'Cash', 'Pending')
     `).run(transactionId);
 
     db.prepare(`

@@ -54,7 +54,7 @@ export function createBalancedJournalEntry(
   const executeTx = db.transaction(() => {
     db.prepare(`
       INSERT INTO journal_entries (id, date, description, created_by)
-      VALUES (?, CURRENT_TIMESTAMP, ?, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?)
     `).run(entryId, description, createdBy);
 
     const insertLine = db.prepare(`

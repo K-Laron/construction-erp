@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from '@/middleware';
+import { middleware } from '@/proxy';
 
 describe('CSP middleware', () => {
   it('sets Content-Security-Policy header', () => {

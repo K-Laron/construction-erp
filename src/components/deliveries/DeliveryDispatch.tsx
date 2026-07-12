@@ -1,7 +1,6 @@
 "use client";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
-import { logger } from "@/lib/logger";
 
 import { useState, useEffect, Fragment } from 'react';
 import { Truck, CheckCircle2, ChevronDown, ChevronUp, Loader2, Calendar } from 'lucide-react';
@@ -29,7 +28,7 @@ export default function DeliveryDispatch() {
       const data = await getPendingDeliveries();
       setDeliveries(data);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       toast.error("Failed to load pending deliveries.");
     }
     setLoading(false);
@@ -51,7 +50,7 @@ export default function DeliveryDispatch() {
       const data = await getDeliveryHistory(transactionId);
       setTrips(data);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       toast.error("Failed to load delivery history.");
     }
     setTripsLoading(false);
@@ -72,7 +71,7 @@ export default function DeliveryDispatch() {
       loadPending();
       toast.success("Delivery confirmed successfully!");
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
     } finally {
       setConfirmDeliveryId(null);
     }

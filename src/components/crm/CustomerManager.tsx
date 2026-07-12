@@ -2,7 +2,6 @@
 import { SkeletonLine } from "@/components/ui/Skeleton";
 
 import { useState, useEffect, Fragment } from 'react';
-import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { Search, UserPlus, CreditCard, ChevronDown, ChevronUp, ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 import { getCustomers, getCustomerLedger } from '@/app/actions/customers';
@@ -32,7 +31,7 @@ export default function CustomerManager() {
       const data = await getCustomers();
       setCustomers(data);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       toast.error("Failed to load customers.");
     }
     setLoading(false);
@@ -55,7 +54,7 @@ export default function CustomerManager() {
       setLedgerData(ledger);
       setIntegrityViolated(isIntegrityViolated);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       toast.error("Failed to load customer ledger.");
     }
     setLedgerLoading(false);

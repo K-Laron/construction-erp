@@ -371,9 +371,7 @@ export async function recordSupplierPayment(
       if (!sup) {
         throw new Error('SUPPLIER_NOT_FOUND: Supplier does not exist.');
       }
-      if (parsed.amount > sup.current_balance) {
-        throw new Error('OVERPAYMENT_NOT_ALLOWED: Payment exceeds supplier outstanding balance.');
-      }
+      // Overpayments are allowed to support credit balances
 
       // 1. Update supplier current balance (decrease outstanding Accounts Payable)
       db.prepare(`

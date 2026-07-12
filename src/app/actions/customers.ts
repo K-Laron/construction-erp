@@ -64,7 +64,7 @@ export async function createCustomer(
 
     db.prepare(`
       INSERT INTO customers (id, name, phone, address, credit_limit, current_balance, price_tier, is_vat_exempt, is_active, created_at)
-      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 1, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, 0, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     `).run(customerId, parsed.name, encryptedPhone, encryptedAddress, parsed.creditLimit, parsed.priceTier, parsed.isVatExempt);
 
     return { success: true, data: customerId };
@@ -126,9 +126,7 @@ export async function recordPayment(customerId: string, amount: number, descript
       if (!cust) {
         throw new Error('CUSTOMER_NOT_FOUND: Customer does not exist.');
       }
-      if (parsed.amount > cust.current_balance) {
-        throw new Error('OVERPAYMENT_NOT_ALLOWED: Payment exceeds customer outstanding balance.');
-      }
+      // Overpayments are allowed to support credit balances (Phase 4 Audit)
 
       // 1. FIFO allocate payment to oldest open invoices first
       const openTxns = db.prepare(`

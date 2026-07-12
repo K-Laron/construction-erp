@@ -108,7 +108,7 @@ export async function dispatchDelivery(
       // 1. Create delivery record
       db.prepare(`
         INSERT INTO deliveries (id, transaction_id, delivery_date, driver_name, truck_plate, status)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, 'Dispatched')
+        VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, 'Dispatched')
       `).run(deliveryId, parsed.transactionId, parsed.driverName, parsed.truckPlate);
 
       // 2. Insert delivery items
@@ -153,7 +153,7 @@ export async function dispatchDelivery(
       // 5. Audit log
       db.prepare(`
         INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-        VALUES (?, CURRENT_TIMESTAMP, ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
+        VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'DELIVERY_DISPATCH', ?, NULL, ?)
       `).run(crypto.randomUUID(), userId, deliveryId, `Driver: ${parsed.driverName}, Plate: ${parsed.truckPlate}, Items: ${parsed.items.length}`);
     })();
 
@@ -170,7 +170,7 @@ export async function confirmDelivery(deliveryId: string): Promise<void> {
   db.prepare("UPDATE deliveries SET status = 'Delivered' WHERE id = ?").run(deliveryId);
   db.prepare(`
     INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-    VALUES (?, CURRENT_TIMESTAMP, ?, 'DELIVERY_CONFIRM', ?, 'Dispatched', 'Delivered')
+    VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'DELIVERY_CONFIRM', ?, 'Dispatched', 'Delivered')
   `).run(crypto.randomUUID(), userId, deliveryId);
 }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { logger } from "@/lib/logger";
 import { ShieldCheck, ShieldAlert, Key, Download, Plus, Loader2, RefreshCw, Search, RotateCcw } from 'lucide-react';
 import { getUsers, createUser } from '@/app/actions/auth';
 import { exportEncryptedBackup, getBackupLogs } from '@/app/actions/backup';
@@ -49,7 +48,7 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
       const bLogs = await getBackupLogs();
       setBackupLogs(bLogs);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
     }
     setLoading(false);
   };

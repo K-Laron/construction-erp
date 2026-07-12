@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { BarChart3, TrendingUp, DollarSign, Users, Package, Loader2 } from 'lucide-react';
 import { getTrialBalance, getTodaySales, getTodayCollections } from '@/app/actions/ledger';
@@ -78,7 +77,7 @@ export default function ReportsPanel() {
         setMargins(calculatedMargins);
 
       } catch (err) {
-        logger.error(String(err), err);
+        console.error(String(err), err);
         toast.error("Failed to load report data.");
       }
       setLoading(false);

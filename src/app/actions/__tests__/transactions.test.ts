@@ -87,7 +87,7 @@ describe('Transaction Server Actions', () => {
 
     // Need a customer
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 1000, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Test Cust', 1000, 0, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1120, 1120, 1)`).run(itemId);
@@ -131,7 +131,7 @@ describe('Transaction Server Actions', () => {
 
   it('processes checkout with vat-exempt customer', async () => {
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at) VALUES (?, 'VAT Exempt Cust', 1000, 0, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at) VALUES (?, 'VAT Exempt Cust', 1000, 0, 1, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
@@ -160,7 +160,7 @@ describe('Transaction Server Actions', () => {
 
   it('handles credit returns and adjusts ledger correctly', async () => {
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Credit Cust', 5000, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'Credit Cust', 5000, 0, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test Credit Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
@@ -257,7 +257,7 @@ describe('Transaction Server Actions', () => {
     db.prepare('DELETE FROM journal_entries').run();
 
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at) VALUES (?, 'Credit DP Cust', 10000, 0, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at) VALUES (?, 'Credit DP Cust', 10000, 0, 1, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Credit DP Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);
@@ -375,7 +375,7 @@ describe('Transaction Server Actions', () => {
 
   it('applies return refunds to customer outstanding balance first (M5)', async () => {
     const customerId = crypto.randomUUID();
-    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'M5 Customer', 10000, 0, 1, CURRENT_TIMESTAMP)`).run(customerId);
+    db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, created_at) VALUES (?, 'M5 Customer', 10000, 0, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active) VALUES (?, 'Test M5 Item', 'Tools', 'pc', 10000, 500, 1000, 1000, 1)`).run(itemId);

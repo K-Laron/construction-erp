@@ -2,7 +2,6 @@
 
 
 import { useState, useEffect } from 'react';
-import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { Search, ShoppingCart, Trash2, Plus, Minus, Tag, Truck, Receipt, Loader2, AlertTriangle } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
@@ -37,7 +36,7 @@ export default function POSRegister({ cashierId, onCheckoutSuccess }: POSRegiste
       const data = await getInventory();
       setInventory(data);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       toast.error("Failed to load inventory.");
     }
     setLoading(false);

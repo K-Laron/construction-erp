@@ -5,7 +5,6 @@ import { Play, Square, AlertCircle, Loader2 } from 'lucide-react';
 import { getCurrentShift, openShift, closeShift } from '@/app/actions/shifts';
 import { formatCurrency, parsePesoCentavos } from '@/lib/format';
 import { toast } from 'sonner';
-import { logger } from "@/lib/logger";
 import Modal from '@/components/ui/Modal';
 
 interface ShiftBarProps {
@@ -36,7 +35,7 @@ export default function ShiftBar({ cashierId, cashierName, onShiftChange }: Shif
           onShiftChange(shift.id);
         }
       } catch (err: unknown) {
-        logger.error(String(err), err);
+        console.error(String(err), err);
         toast.error("Failed to load shift data.");
       }
     }

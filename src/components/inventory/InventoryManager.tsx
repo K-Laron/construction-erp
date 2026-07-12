@@ -2,7 +2,6 @@
 import { SkeletonLine } from "@/components/ui/Skeleton";
 
 import { useState, useEffect } from 'react';
-import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { Search, PlusCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
@@ -23,7 +22,7 @@ export default function InventoryManager() {
       const data = await getInventory();
       setInventory(data);
     } catch (err) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       toast.error("Failed to load inventory.");
     }
     setLoading(false);

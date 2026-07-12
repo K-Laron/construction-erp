@@ -15,7 +15,7 @@ describe('Customer Payment Invoice Allocation (FIFO)', () => {
   it('payment reduces oldest invoice first', async () => {
     const customerId = crypto.randomUUID();
     db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at)
-      VALUES (?, 'FIFO Cust 1', 10000, 0, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+      VALUES (?, 'FIFO Cust 1', 10000, 0, 1, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active)
@@ -83,7 +83,7 @@ describe('Customer Payment Invoice Allocation (FIFO)', () => {
   it('payment spanning two invoices', async () => {
     const customerId = crypto.randomUUID();
     db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at)
-      VALUES (?, 'FIFO Cust 2', 10000, 0, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+      VALUES (?, 'FIFO Cust 2', 10000, 0, 1, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
     const itemId = crypto.randomUUID();
     db.prepare(`INSERT INTO inventory (id, name, category, unit, stock_quantity, cost_price, selling_price, wholesale_price, is_active)
@@ -126,15 +126,17 @@ describe('Customer Payment Invoice Allocation (FIFO)', () => {
     expect(newestAfter.payment_status).toBe('Partial');
   });
 
-  it('rejects overpayment exceeding current balance', async () => {
+  it('allows overpayment to create a credit balance', async () => {
     const customerId = crypto.randomUUID();
     db.prepare(`INSERT INTO customers (id, name, credit_limit, current_balance, is_active, is_vat_exempt, created_at)
-      VALUES (?, 'FIFO Cust 3', 10000, 500, 1, 1, CURRENT_TIMESTAMP)`).run(customerId);
+      VALUES (?, 'FIFO Cust 3', 10000, 500, 1, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(customerId);
 
-    // Balance is 500, try paying 501
+    // Balance is 500, pay 501
     const res = await recordPayment(customerId, 501, 'Overpay attempt');
-    expect(res.success).toBe(false);
-    expect(res.error).toMatch(/OVERPAYMENT|exceed|balance/i);
+    expect(res.success).toBe(true);
+
+    const cust = db.prepare("SELECT current_balance FROM customers WHERE id = ?").get(customerId) as { current_balance: number };
+    expect(cust.current_balance).toBe(-1); // 500 - 501 = -1
   });
 });
 

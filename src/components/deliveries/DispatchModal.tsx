@@ -1,6 +1,5 @@
 "use client";
 import { toast } from "sonner";
-import { logger } from "@/lib/logger";
 
 import { useState, useEffect } from 'react';
 import { Loader2, AlertTriangle, Truck } from 'lucide-react';
@@ -36,7 +35,7 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
           });
           setDispatchQtys(initialQtys);
         })
-        .catch(err => { logger.error(err.message, err); toast.error("Failed to load remaining items."); })
+        .catch(err => { console.error(err.message, err); toast.error("Failed to load remaining items."); })
         .finally(() => setLoading(false));
       setError('');
       setDriverName('');

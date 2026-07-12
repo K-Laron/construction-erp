@@ -147,7 +147,7 @@ export async function unlockStore(dop: string): Promise<UnlockResult> {
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, NULL, 'STORE_UNLOCK_FAILED', NULL, NULL, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, 'STORE_UNLOCK_FAILED', NULL, NULL, ?)
     `).run(crypto.randomUUID(), ipAddress);
 
     return { success: false, error: "Invalid Daily Operational Passphrase." };
@@ -210,7 +210,7 @@ export async function recoverStore(mnemonicWords: string[], newDop: string): Pro
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, NULL, 'STORE_RECOVERY_SUCCESS', NULL, NULL, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, 'STORE_RECOVERY_SUCCESS', NULL, NULL, ?)
     `).run(crypto.randomUUID(), ipAddress);
 
     return { success: true };
@@ -222,7 +222,7 @@ export async function recoverStore(mnemonicWords: string[], newDop: string): Pro
 
     db.prepare(`
       INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
-      VALUES (?, CURRENT_TIMESTAMP, NULL, 'STORE_RECOVERY_FAILED', NULL, NULL, ?)
+      VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, 'STORE_RECOVERY_FAILED', NULL, NULL, ?)
     `).run(crypto.randomUUID(), ipAddress);
 
     return { success: false, error: "Invalid Recovery Mnemonic Passphrase." };

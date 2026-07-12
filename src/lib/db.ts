@@ -86,7 +86,7 @@ export async function runMigrations(mlekSecret?: string) {
       const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
       const runSql = db.transaction(() => {
         db.exec(sql);
-        db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, CURRENT_TIMESTAMP)").run(version);
+        db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run(version);
       });
       runSql();
       logger.info(`Successfully applied SQL migration: ${file}`);
@@ -104,7 +104,7 @@ export async function runMigrations(mlekSecret?: string) {
         const migration = requireFunc(migrationPath);
         const migrateFn = typeof migration === 'function' ? migration : migration.default;
         await migrateFn(db, mlekSecret);
-        db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, CURRENT_TIMESTAMP)").run(version);
+        db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run(version);
         db.prepare('COMMIT').run();
         logger.info(`Successfully applied programmatic JS migration: ${file}`);
       } catch (err) {

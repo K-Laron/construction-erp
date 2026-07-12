@@ -1,6 +1,5 @@
 "use client";
 import { toast } from "sonner";
-import { logger } from "@/lib/logger";
 
 import { useState, useEffect } from 'react';
 import { ShieldAlert, CreditCard, Banknote, UserCheck, CheckCircle2, Printer, Loader2 } from 'lucide-react';
@@ -42,14 +41,14 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
     if (isOpen) {
       getCustomers()
         .then(setCustomers)
-        .catch(err => { logger.error(err.message, err); toast.error("Failed to load customers."); });
+        .catch(err => { console.error(err.message, err); toast.error("Failed to load customers."); });
       getUsers()
         .then(users => {
           const mgrs = users.filter(u => u.is_active === 1 && (u.role === 'Admin' || u.role === 'Manager'));
           setManagers(mgrs);
           if (mgrs.length > 0) setSelectedManagerUsername(mgrs[0].username);
         })
-        .catch(err => { logger.error(err.message, err); toast.error("Failed to load users."); });
+        .catch(err => { console.error(err.message, err); toast.error("Failed to load users."); });
       setSuccessData(null);
       setError('');
       setAmountPaidStr('');

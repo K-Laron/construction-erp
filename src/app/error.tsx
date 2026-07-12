@@ -1,5 +1,4 @@
 "use client";
-import { logger } from "@/lib/logger";
 
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -13,7 +12,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     // Log the error to an error reporting service
-    logger.error("Unhandled Global Error: " + error.message, error);
+    console.error("Unhandled Global Error: " + error.message, error);
   }, [error]);
 
   return (

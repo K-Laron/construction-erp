@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { logger } from "@/lib/logger";
 import { getStoreStatus, lockStoreAction } from '@/app/actions/store';
 import UnlockScreen from '@/components/UnlockScreen';
 import LoginScreen from '@/components/LoginScreen';
@@ -35,7 +34,7 @@ export default function Home() {
         setCurrentUser(null);
       }
     } catch (err: unknown) {
-      logger.error(String(err), err);
+      console.error(String(err), err);
       if (err instanceof Error && (err.message.includes('DATABASE_LOCKED') || err.message.includes('UNAUTHORIZED'))) {
         setIsUnlocked(false);
         setCurrentUser(null);
@@ -60,7 +59,7 @@ export default function Home() {
       const { logoutUser } = await import('@/app/actions/auth');
       await logoutUser();
     } catch (err) {
-      logger.error('Failed to log out on server:', err);
+      console.error('Failed to log out on server:', err);
     }
     setCurrentUser(null);
   };
