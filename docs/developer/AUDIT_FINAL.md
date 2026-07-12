@@ -98,7 +98,7 @@ This document records every finding identified during the multi-phase security a
 | R1 | 5 | **Missing `description` in `customer_ledger` INSERT** — column omitted from insert statement | Added the missing column | ✅ |
 | R2 | 5 | **Inline HMAC bypass** — ad-hoc HMAC computation instead of shared utility | All call sites now use `calculateHMACSignature()` consistently | ✅ |
 | — | 5 | **`getTransactions` untyped** | Return type added | ✅ |
-| — | 5 | **`datetime('now')` inconsistency** — mixed timestamp functions across 14 files | Standardized to `CURRENT_TIMESTAMP` across the codebase | ✅ |
+| — | 5 | **`datetime('now')` / `CURRENT_TIMESTAMP` inconsistency** — mixed timestamp functions and non-ISO string formats across 14 files | Standardized to strict ISO-8601 (`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`) across the codebase to ensure correct chronological string sorting | ✅ |
 | — | 5 | **No stock audit trail** — inventory adjustments not logged | IN/OUT movements now recorded in `system_audit_logs` | ✅ |
 | — | 5 | **`JournalLineInput` type missing** — journal entry lines used raw objects | `JournalLineInput` type added and applied | ✅ |
 | L1 | 6 | **`console.log` in production** — debug output leaks to browser console | Gated behind `process.env.NODE_ENV !== 'production'` | ✅ |
@@ -152,6 +152,16 @@ This document records every finding identified during the multi-phase security a
 | Security | Insecure PRNG `Math.random` used to generate admin PIN on bootstrap | Replaced with cryptographically secure `crypto.randomInt` generator | ✅ |
 | Security / Auto-lock | Read-only shifts queries passively reset the inactivity timeout | Modified actions `getCurrentShift`, `getZReading`, and `getShiftHistory` to call `checkMlek(false)` | ✅ |
 | UX | No client redirect to login screen on inactivity lock | Added 30s status polling in client `Home` wrapper to flush user state and show Unlock screen | ✅ |
+
+---
+
+## Phase 12: Final Audit Remediation (Regressions & Business Sign-off)
+
+| Area | Finding | Resolution | Status |
+|---|---|---|---|
+| Business Logic | Delivery fee VAT policy unresolved | Business stakeholder explicitly signed off on Option A (charging 12% VAT on delivery fees). Code is correct as-is. | ✅ |
+| Logic Regression | Overpayments blocked by `MAX(0)` guard reversion | Removed the strict overpayment throw guards in `inventory.ts` and `customers.ts` to re-allow proper credit balances | ✅ |
+| Data Integrity | Timestamp string sort bug | Replaced all `CURRENT_TIMESTAMP` usages with strict `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')` across the codebase to ensure ISO-8601 sorting compliance | ✅ |
 
 ---
 
