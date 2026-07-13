@@ -2,7 +2,7 @@
 
 import db from '@/lib/db';
 import crypto from 'crypto';
-import { Transaction, TransactionItem } from '@/types';
+import { Transaction, TransactionItem } from '@/types/pos';
 import { calculateHMACSignature } from '@/lib/ledger_helpers';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { z } from 'zod';
@@ -44,7 +44,7 @@ const CartItemSchema = z.object({
   totalPrice: z.number().int().nonnegative()
 });
 
-export const CheckoutPayloadSchema = z.object({
+const CheckoutPayloadSchema = z.object({
   customerId: z.string().nullable(),
   items: z.array(CartItemSchema).min(1, "Cart cannot be empty"),
   subtotal: z.number().int().nonnegative(),
@@ -58,7 +58,7 @@ export const CheckoutPayloadSchema = z.object({
   overrideUsername: z.string().optional()
 });
 
-export const ProcessReturnSchema = z.object({
+const ProcessReturnSchema = z.object({
   transactionId: z.string().uuid(),
   itemsToReturn: z.array(z.object({
     itemId: z.string().uuid(),

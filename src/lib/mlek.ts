@@ -36,3 +36,20 @@ export function isMlekUnlocked(): boolean {
     return false;
   }
 }
+
+const healthCheckTimers = new Set<ReturnType<typeof setInterval>>();
+
+// ponytail: single-interval health check, no observability framework
+export function startMlekHealthCheck(intervalMs = 60000): void {
+  const timer = setInterval(() => {
+    if (globalThis.mlekSecret && !isMlekUnlocked()) {
+      console.warn('[MLEK] Health check: store lock detected (inactivity timeout).');
+    }
+  }, intervalMs);
+  healthCheckTimers.add(timer);
+}
+
+export function stopMlekHealthChecks(): void {
+  for (const t of healthCheckTimers) clearInterval(t);
+  healthCheckTimers.clear();
+}

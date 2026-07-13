@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Search, PlusCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
 import { formatCurrency, formatQuantity } from '@/lib/format';
-import { InventoryItem } from '@/types';
+import { InventoryItem } from '@/types/inventory';
 import ProductFormModal from './ProductFormModal';
 
 export default function InventoryManager() {

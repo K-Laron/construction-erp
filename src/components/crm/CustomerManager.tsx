@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Search, UserPlus, CreditCard, ChevronDown, ChevronUp, ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 import { getCustomers, getCustomerLedger } from '@/app/actions/customers';
 import { formatCurrency, formatDate } from '@/lib/format';
-import { Customer, CustomerLedgerEntry } from '@/types';
+import { Customer, CustomerLedgerEntry } from '@/types/crm';
 import CustomerFormModal from './CustomerFormModal';
 import PaymentModal from './PaymentModal';
 

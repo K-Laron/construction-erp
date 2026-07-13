@@ -4,11 +4,12 @@ import { toast } from "sonner";
 import { useState, useEffect } from 'react';
 import { ShieldAlert, CreditCard, Banknote, UserCheck, CheckCircle2, Printer, Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
+import { SkeletonLine } from '@/components/ui/Skeleton';
 import { getCustomers } from '@/app/actions/customers';
 import { processCheckout, CartItem } from '@/app/actions/transactions';
 import { getUsers } from '@/app/actions/auth';
 import { formatCurrency } from '@/lib/format';
-import { Customer } from '@/types';
+import { Customer } from '@/types/crm';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Credit' | 'Check'>('Cash');
   const [amountPaidStr, setAmountPaidStr] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState('');
   const [overridePin, setOverridePin] = useState<string>('');
   const [managers, setManagers] = useState<{ username: string; name: string }[]>([]);
@@ -39,19 +41,22 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
 
   useEffect(() => {
     if (isOpen) {
-      getCustomers()
-        .then(setCustomers)
-        .catch(err => { console.error(err.message, err); toast.error("Failed to load customers."); });
-      getUsers()
-        .then(users => {
-          const mgrs = users.filter(u => u.is_active === 1 && (u.role === 'Admin' || u.role === 'Manager'));
-          setManagers(mgrs);
-          if (mgrs.length > 0) setSelectedManagerUsername(mgrs[0].username);
-        })
-        .catch(err => { console.error(err.message, err); toast.error("Failed to load users."); });
+      setDataLoading(true);
       setSuccessData(null);
       setError('');
       setAmountPaidStr('');
+      Promise.allSettled([
+        getCustomers()
+          .then(setCustomers)
+          .catch(err => { console.error(err.message, err); toast.error("Failed to load customers."); }),
+        getUsers()
+          .then(users => {
+            const mgrs = users.filter(u => u.is_active === 1 && (u.role === 'Admin' || u.role === 'Manager'));
+            setManagers(mgrs);
+            if (mgrs.length > 0) setSelectedManagerUsername(mgrs[0].username);
+          })
+          .catch(err => { console.error(err.message, err); toast.error("Failed to load users."); })
+      ]).finally(() => setDataLoading(false));
     }
   }, [isOpen]);
 
@@ -127,6 +132,9 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
             <label htmlFor="checkout-customer" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase tracking-wider">
               Customer Account
             </label>
+            {dataLoading ? (
+              <SkeletonLine className="h-10 w-full rounded-xl" />
+            ) : (
             <select
               id="checkout-customer"
               value={selectedCustomerId}
@@ -140,6 +148,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, totals, onSu
                 </option>
               ))}
             </select>
+            )}
           </div>
 
           {/* Customer Credit Info */}

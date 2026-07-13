@@ -46,3 +46,9 @@ next-env.d.ts
 
 certificates/
 test.db
+
+# opencode personal config
+.opencode/
+
+# knowledge graph build output
+graphify-out/

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { useState, useEffect } from 'react';
 import { Loader2, AlertTriangle, Truck } from 'lucide-react';
+import { SkeletonLine } from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
 import { getDeliveryRemainingItems, dispatchDelivery } from '@/app/actions/deliveries';
 import { formatQuantity, parseMillicounts } from '@/lib/format';
@@ -118,6 +119,9 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
 
         <div>
           <label htmlFor="dispatch-items" className="block text-xs font-semibold text-interactive-400 mb-1.5 uppercase">Items to Deliver</label>
+          {loading && items.length === 0 ? (
+            <SkeletonLine className="h-48 w-full rounded-xl" />
+          ) : (
           <div id="dispatch-items" className="border border-surface-800 rounded-xl overflow-hidden bg-surface-950/20 max-h-60 overflow-y-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-surface-900 text-interactive-400 font-semibold border-b border-surface-800">
@@ -156,6 +160,7 @@ export default function DispatchModal({ isOpen, onClose, transactionId, onSucces
               </tbody>
             </table>
           </div>
+          )}
         </div>
 
         <div className="flex gap-3 pt-4">

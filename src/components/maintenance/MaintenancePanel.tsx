@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ShieldCheck, ShieldAlert, Key, Download, Plus, Loader2, RefreshCw, Search, RotateCcw } from 'lucide-react';
+import { SkeletonLine } from '@/components/ui/Skeleton';
 import { getUsers, createUser } from '@/app/actions/auth';
 import { exportEncryptedBackup, getBackupLogs } from '@/app/actions/backup';
 import { runDailyGLScan } from '@/app/actions/ledger';
@@ -214,7 +215,12 @@ export default function MaintenancePanel({ currentUser }: MaintenancePanelProps)
         </div>
       </div>
 
-      {tab === 'settings' ? (
+      {loading ? (
+        <div className="space-y-4">
+          <SkeletonLine className="h-64 w-full rounded-xl" />
+          <SkeletonLine className="h-48 w-full rounded-xl" />
+        </div>
+      ) : tab === 'settings' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* User Management */}
           <div className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-4">

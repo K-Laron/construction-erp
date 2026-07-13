@@ -3,13 +3,15 @@ import { SkeletonLine } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
 
 import { useState, useEffect, Fragment } from 'react';
-import { Truck, CheckCircle2, ChevronDown, ChevronUp, Loader2, Calendar } from 'lucide-react';
+import { Truck, CheckCircle2, ChevronDown, ChevronUp, Loader2, Calendar, LayoutGrid, Table2 } from 'lucide-react';
 import { getPendingDeliveries, getDeliveryHistory, confirmDelivery } from '@/app/actions/deliveries';
 import { formatCurrency, formatDate, formatQuantity } from '@/lib/format';
 import Modal from '@/components/ui/Modal';
 import DispatchModal from './DispatchModal';
+import DeliveryCalendar from './DeliveryCalendar';
 
 export default function DeliveryDispatch() {
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDeliveryId, setConfirmDeliveryId] = useState<string | null>(null);
@@ -84,9 +86,32 @@ export default function DeliveryDispatch() {
           <h1 className="text-xl font-bold text-white">Logistics & Dispatches</h1>
           <p className="text-interactive-400 text-xs mt-1">Manage delivery dispatches, track driver trips, and status logs</p>
         </div>
+        {/* View toggle: table / calendar */}
+        <div className="flex gap-1.5 p-1 bg-surface-900 rounded-xl border border-surface-800 w-fit">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-interactive-400 hover:text-interactive-500'
+            }`}
+          >
+            <Table2 className="w-3.5 h-3.5" />
+            Table
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              viewMode === 'calendar' ? 'bg-indigo-600 text-white' : 'text-interactive-400 hover:text-interactive-500'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            Calendar
+          </button>
+        </div>
       </div>
 
-      {loading ? (
+      {viewMode === 'calendar' ? (
+        <DeliveryCalendar />
+      ) : loading ? (
         <SkeletonLine className="w-full h-48" />
       ) : deliveries.length === 0 ? (
         <div className="border border-surface-800 rounded-xl p-12 text-center text-interactive-400 text-sm">

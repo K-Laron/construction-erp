@@ -268,7 +268,7 @@ Build a desktop-first, local-first management suite to operate a complete small-
 ### Phase 7: Profit Reports & Role Access Controls
 
 #### Task 7.1: Reports Dashboard
-- **Description**: Build `src/components/ReportsPanel.tsx` listing key charts: daily sales (cash vs credit), accounts receivable aging list, and collections ledger.
+- **Description**: Build `src/features/reports/ReportsPanel.tsx` listing key charts: daily sales (cash vs credit), accounts receivable aging list, and collections ledger.
 - **Approval Metrics**:
   1. Cash collections and receivables totals calculate correctly.
   2. Lists all outstanding debts sorted by amount.
@@ -585,12 +585,12 @@ node scratch/verify-all-modules.js
 ---
 
 ## Current Project Health (as of Phase 17 + audit cleanup)
-- **Test Suites:** 16 (12 server action + 3 component + 1 library)
-- **Tests:** 103, all passing
+- **Test Suites:** 17 (12 server action + 4 component + 1 library)
+- **Tests:** 110, all passing
 - **TypeScript:** `tsc --noEmit` clean
 - **Security:** Zero known vulnerabilities. `Math.random()` eliminated from all security-sensitive paths. All catch blocks use `unknown` type narrowing. All form labels have `htmlFor`/`id` associations. No stray UI toasts. React key warnings resolved. RBAC enforcement tested. Parallel stock-deduction concurrency tested.
 - **Migrations:** 6 SQL migrations, 2 programmatic JS migrations
 - **Server Actions:** 10, all with structured error returns
-- **Components:** 19 (including UI primitives)
+- **Components:** 20 (including UI primitives)
 - **Receipt:** A6 portrait (105×148mm), 5-column ruled table, underline fields, signatures footer, 6mm margins
 - **Shared Libraries:** 9

@@ -2,7 +2,7 @@
 
 import db from '@/lib/db';
 import crypto from 'crypto';
-import { getActiveUserId, requireAuth } from './auth';
+import { getActiveUserId, requireAuth, requireAuthAndMlek } from './auth';
 import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
 
@@ -172,6 +172,91 @@ export async function confirmDelivery(deliveryId: string): Promise<void> {
     INSERT INTO system_audit_logs (id, timestamp, user_id, action_type, reference_id, old_value, new_value)
     VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, 'DELIVERY_CONFIRM', ?, 'Dispatched', 'Delivered')
   `).run(crypto.randomUUID(), userId, deliveryId);
+}
+
+// Calendar: fetch deliveries in a date range + unscheduled pending transactions
+export interface CalendarDelivery {
+  id: string;
+  transaction_id: string;
+  delivery_date: string;
+  driver_name: string;
+  truck_plate: string;
+  status: string;
+  items: { id: string; item_id: string; quantity_delivered: number; item_name: string; unit: string }[];
+}
+
+export interface UnscheduledTransaction {
+  transaction_id: string;
+  date: string;
+  delivery_status: string;
+  customer_name: string | null;
+  item_count: number;
+}
+
+export async function getDeliveryCalendarData(startDate: string, endDate: string): Promise<{
+  byDate: Record<string, CalendarDelivery[]>;
+  unscheduled: UnscheduledTransaction[];
+}> {
+  await requireAuthAndMlek();
+
+  // Deliveries in range (with items)
+  const deliveryRows = db.prepare(`
+    SELECT d.id, d.transaction_id, d.delivery_date, d.driver_name, d.truck_plate, d.status,
+           di.id as di_id, di.item_id, di.quantity_delivered,
+           i.name as item_name, i.unit
+    FROM deliveries d
+    LEFT JOIN delivery_items di ON di.delivery_id = d.id
+    LEFT JOIN inventory i ON di.item_id = i.id
+    WHERE d.delivery_date BETWEEN ? AND ?
+    ORDER BY d.delivery_date ASC
+  `).all(startDate, endDate) as any[];
+
+  // Group into deliveries with items
+  const deliveryMap = new Map<string, CalendarDelivery>();
+  for (const row of deliveryRows) {
+    if (!deliveryMap.has(row.id)) {
+      deliveryMap.set(row.id, {
+        id: row.id,
+        transaction_id: row.transaction_id,
+        delivery_date: row.delivery_date,
+        driver_name: row.driver_name,
+        truck_plate: row.truck_plate,
+        status: row.status,
+        items: [],
+      });
+    }
+    if (row.di_id) {
+      deliveryMap.get(row.id)!.items.push({
+        id: row.di_id,
+        item_id: row.item_id,
+        quantity_delivered: row.quantity_delivered,
+        item_name: row.item_name,
+        unit: row.unit,
+      });
+    }
+  }
+
+  // Group by ISO date
+  const byDate: Record<string, CalendarDelivery[]> = {};
+  for (const dlv of deliveryMap.values()) {
+    const day = dlv.delivery_date.slice(0, 10); // "2026-07-14"
+    if (!byDate[day]) byDate[day] = [];
+    byDate[day].push(dlv);
+  }
+
+  // Unscheduled: pending transactions with no deliveries yet
+  const unscheduled = db.prepare(`
+    SELECT t.id as transaction_id, t.date, t.delivery_status,
+           c.name as customer_name,
+           (SELECT COUNT(*) FROM transaction_items ti WHERE ti.transaction_id = t.id) as item_count
+    FROM transactions t
+    LEFT JOIN customers c ON t.customer_id = c.id
+    WHERE t.delivery_status != 'Fully Delivered'
+      AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.transaction_id = t.id)
+    ORDER BY t.date ASC
+  `).all() as UnscheduledTransaction[];
+
+  return { byDate, unscheduled };
 }
 
 // Get delivery history for a transaction

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import db from '@/lib/db';
-import { dispatchDelivery, confirmDelivery, getDeliveryHistory, getPendingDeliveries } from '../deliveries';
+import { dispatchDelivery, confirmDelivery, getDeliveryHistory, getPendingDeliveries, getDeliveryCalendarData } from '../deliveries';
 import { getMlekSecret, setMlekSecret } from '@/lib/mlek';
 import crypto from 'crypto';
 import { runMigrations } from '@/lib/db';
@@ -99,5 +99,47 @@ describe('Deliveries API', () => {
     const match = pending.find(p => p.transaction_id === transactionId);
     expect(match).toBeDefined();
     expect(match!.delivery_status).toBe('Pending');
+  });
+
+  it('getDeliveryCalendarData returns unscheduled and by-date deliveries', async () => {
+    // Dispatch a delivery so there's something in-range
+    const { data: deliveryId } = await dispatchDelivery(transactionId, 'Cal Driver', 'CAL-001', [
+      { itemId, quantityDelivered: 2000 }
+    ]);
+
+    // Fetch calendar data covering today
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await getDeliveryCalendarData(
+      new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+      new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    );
+
+    // Dispatched delivery appears under today's date
+    expect(Object.keys(result.byDate)).toContain(today);
+    expect(result.byDate[today].length).toBeGreaterThanOrEqual(1);
+    expect(result.byDate[today][0].driver_name).toBe('Cal Driver');
+
+    // No unscheduled since our only transaction was dispatched
+    // (transaction was dispatched above, so it's NOT unscheduled anymore)
+    const unscheduledMatch = result.unscheduled.find(u => u.transaction_id === transactionId);
+    expect(unscheduledMatch).toBeUndefined();
+  });
+
+  it('getDeliveryCalendarData rejects unauthenticated calls (COR-01 guard)', async () => {
+    const { getSession } = await import('@/lib/session');
+    vi.mocked(getSession).mockResolvedValueOnce({ userId: undefined, role: undefined, save: vi.fn() });
+    await expect(getDeliveryCalendarData('2026-01-01', '2026-01-31')).rejects.toThrow('UNAUTHORIZED');
+  });
+
+  it('getDeliveryCalendarData shows pending transaction as unscheduled', async () => {
+    // transactionId is 'Pending' with no deliveries — should appear in unscheduled
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await getDeliveryCalendarData(today, today);
+
+    const match = result.unscheduled.find(u => u.transaction_id === transactionId);
+    expect(match).toBeDefined();
+    expect(match!.delivery_status).toBe('Pending');
+    // Not in byDate since no dispatch happened
+    expect(Object.keys(result.byDate).length).toBe(0);
   });
 });

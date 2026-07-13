@@ -15,7 +15,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 | Styling     | Tailwind CSS v4, CSS custom property theming   |
 | Icons       | Lucide React                        |
 | Fonts       | Fira Sans (body), Fira Code (heading/mono)
-| Testing     | Vitest (16 suites, 102 tests)        |
+| Testing     | Vitest (17 suites, 110 tests)        |
 | Logging     | Structured logger (JSON, level-filtered)  |
 
 ## Features
@@ -26,7 +26,7 @@ A local-first, offline-capable Point-of-Sale and Enterprise Resource Planning sy
 - **Inventory Management** — Millicount precision (eliminates decimal drift), supplier procurement, and low-stock alerts
 - **Customer CRM** — Encrypted PII (AES-256-GCM), credit limits, and HMAC-chained ledger entries
 - **Double-Entry General Ledger** — Balanced journal entries with cryptographic integrity verification
-- **Delivery Dispatch** — TOCTOU-safe validation inside database transactions
+- **Delivery Dispatch** — TOCTOU-safe validation inside database transactions. Calendar view (month/week/agenda) with keyboard-navigable grid, unscheduled panel, and day-detail trip cards.
 - **Shift Management** — Z-readings with BIR-compliant vatable sales extraction
 
 ### Architecture
@@ -99,8 +99,10 @@ src/
 │   ├── maintenance/    # System maintenance UI
 │   ├── pos/            # Point-of-sale UI
 │   ├── print/          # A6 receipt engine
-│   ├── reports/        # Reporting dashboards
 │   └── ui/             # Shared UI primitives (SkeletonLine, Modal, etc.)
+│
+├── features/           # Feature-based modules
+│   └── reports/        # Reporting dashboards
 │
 └── migrations/         # 6 SQL + 1 JS migration
     ├── 001_initial_schema
@@ -115,7 +117,7 @@ src/
 
 ## Testing
 
-**16 test suites · 103 tests passing · tsc --noEmit clean (source)**
+**17 test suites · 110 tests passing · tsc --noEmit clean (source)**
 
 All tests run against in-memory SQLite with the full migration suite applied.
 
@@ -136,13 +138,14 @@ All tests run against in-memory SQLite with the full migration suite applied.
 | `customers_payments`      | FIFO payment allocation, customer CRUD, HMAC integrity scan |
 | `store`                   | Store lifecycle (unlock/lock/status)                   |
 
-### Component Tests (3 suites)
+### Component Tests (4 suites)
 
-| Suite            | Component under test    |
-| ---------------- | ----------------------- |
-| `CheckoutModal`  | Checkout flow UI        |
-| `POSRegister`    | POS register interface  |
-| `PaymentModal`   | Payment processing UI   |
+| Suite              | Component under test         |
+| ------------------ | ---------------------------- |
+| `CheckoutModal`    | Checkout flow UI             |
+| `POSRegister`      | POS register interface       |
+| `PaymentModal`     | Payment processing UI        |
+| `DeliveryCalendar` | Calendar/month/week/agenda views, skeleton→data transition, table↔calendar toggle |
 
 ### Library Tests (1 suite)
 

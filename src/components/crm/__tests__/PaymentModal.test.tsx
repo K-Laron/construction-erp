@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PaymentModal from '../PaymentModal';
-import type { Customer } from '@/types';
+import type { Customer } from '@/types/crm';
 
 vi.mock('@/app/actions/customers', () => ({
   recordPayment: vi.fn()

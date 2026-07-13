@@ -14,6 +14,7 @@ import { getClientIP } from '@/lib/request';
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW = 300000; // 5 min
 const RATE_LIMIT_CLEANUP_INTERVAL = 600000; // 10 min
+const RATE_LIMIT_MAX_ENTRIES = 10000;
 const backupIpTracker = new Map<string, { count: number; windowStart: number }>();
 let lastCleanup = 0;
 
@@ -28,6 +29,19 @@ function checkRateLimit(ip: string): boolean {
       }
     }
     lastCleanup = now;
+  }
+
+  // ponytail: LRU cap -- evict oldest entry when over limit, prevents memory exhaustion
+  if (backupIpTracker.size >= RATE_LIMIT_MAX_ENTRIES) {
+    let oldestKey = ip;
+    let oldestTime = now;
+    for (const [key, entry] of backupIpTracker) {
+      if (entry.windowStart < oldestTime) {
+        oldestKey = key;
+        oldestTime = entry.windowStart;
+      }
+    }
+    backupIpTracker.delete(oldestKey);
   }
 
   const entry = backupIpTracker.get(ip);

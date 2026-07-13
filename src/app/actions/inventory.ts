@@ -2,7 +2,7 @@
 
 import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
-import { InventoryItem, Supplier, SupplierLedgerEntry } from '@/types';
+import { InventoryItem, Supplier, SupplierLedgerEntry } from '@/types/inventory';
 import crypto from 'crypto';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
 import { calculateHMACSignature } from '@/lib/ledger_helpers';

@@ -42,6 +42,13 @@ export async function requireAuth(allowedRoles?: ('Cashier' | 'Manager' | 'Admin
   return userId;
 }
 
+// Combined auth + MLEK guard for functions that need both (36 of 40 server actions).
+// ponytail: circuit breaker omitted — getMlekSecret() is synchronous, no I/O to fail
+export async function requireAuthAndMlek(allowedRoles?: ('Cashier' | 'Manager' | 'Admin')[]): Promise<Buffer> {
+  await requireAuth(allowedRoles);
+  return getMlekSecret();
+}
+
 export async function checkManagerRole(): Promise<string> {
   return requireAuth(['Manager', 'Admin']);
 }

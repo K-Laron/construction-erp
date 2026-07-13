@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { recordPayment } from '@/app/actions/customers';
 import { parsePesoCentavos, formatCurrency } from '@/lib/format';
-import { Customer } from '@/types';
+import { Customer } from '@/types/crm';
 
 interface PaymentModalProps {
   isOpen: boolean;

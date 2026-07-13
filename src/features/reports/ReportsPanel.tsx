@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from "sonner";
-import { BarChart3, TrendingUp, DollarSign, Users, Package, Loader2 } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, Users, Package } from 'lucide-react';
+import { SkeletonLine } from '@/components/ui/Skeleton';
 import { getTrialBalance, getTodaySales, getTodayCollections } from '@/app/actions/ledger';
 import { getInventory } from '@/app/actions/inventory';
 import { getCustomers } from '@/app/actions/customers';
 import { formatCurrency } from '@/lib/format';
-import { InventoryItem, Customer } from '@/types';
+import { InventoryItem } from '@/types/inventory';
+import { Customer } from '@/types/crm';
 
 export default function ReportsPanel() {
   const [loading, setLoading] = useState(true);
@@ -39,11 +41,11 @@ export default function ReportsPanel() {
         setGlAccounts(glData);
 
         // Calculate outstanding AR
-        const arAcc = glData.find(a => a.code === '1110'); // Accounts Receivable
-        const cashAcc = glData.find(a => a.code === '1010'); // Cash Drawer
+        const arAcc = glData.find((a: any) => a.code === '1110'); // Accounts Receivable
+        const cashAcc = glData.find((a: any) => a.code === '1010'); // Cash Drawer
         
         // Calculate total inventory cost value
-        const totalInvCost = invData.reduce((sum, item) => sum + Math.round((item.stock_quantity * item.cost_price) / 1000), 0);
+        const totalInvCost = invData.reduce((sum: number, item: any) => sum + Math.round((item.stock_quantity * item.cost_price) / 1000), 0);
 
         const todaySales = await getTodaySales();
         const todayCollections = await getTodayCollections();
@@ -62,7 +64,7 @@ export default function ReportsPanel() {
         setAgingList(sortedAging);
 
         // Margins analysis
-        const calculatedMargins = invData.map(item => {
+        const calculatedMargins = invData.map((item: any) => {
           const margin = item.selling_price - item.cost_price;
           const pct = item.selling_price > 0 ? (margin / item.selling_price) * 100 : 0;
           return {
@@ -73,7 +75,7 @@ export default function ReportsPanel() {
             margin,
             marginPct: pct
           };
-        }).sort((a, b) => b.marginPct - a.marginPct);
+        }).sort((a: any, b: any) => b.marginPct - a.marginPct);
         setMargins(calculatedMargins);
 
       } catch (err) {
@@ -87,8 +89,32 @@ export default function ReportsPanel() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center no-print">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto no-print">
+        <div className="border-b border-surface-800 pb-5 space-y-2">
+          <SkeletonLine className="h-7 w-64" />
+          <SkeletonLine className="h-4 w-96" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-3">
+              <div className="flex justify-between items-center">
+                <SkeletonLine className="h-3 w-24" />
+                <SkeletonLine className="h-8 w-8 rounded-lg" />
+              </div>
+              <SkeletonLine className="h-7 w-28" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-4">
+            <SkeletonLine className="h-5 w-48" />
+            <SkeletonLine className="h-64 w-full rounded-lg" />
+          </div>
+          <div className="p-5 border border-surface-800 rounded-xl bg-surface-950/40 space-y-4">
+            <SkeletonLine className="h-5 w-48" />
+            <SkeletonLine className="h-64 w-full rounded-lg" />
+          </div>
+        </div>
       </div>
     );
   }

@@ -2,11 +2,11 @@
 
 import db from '@/lib/db';
 import { encryptField, decryptField } from '@/lib/crypto';
-import { Customer, CustomerLedgerEntry } from '@/types';
+import { Customer, CustomerLedgerEntry } from '@/types/crm';
 import crypto from 'crypto';
 import { calculateHMACSignature } from '@/lib/ledger_helpers';
 import { createBalancedJournalEntry } from '@/lib/ledger_helpers';
-import { getActiveUserId, requireAuth } from './auth';
+import { getActiveUserId, requireAuth, requireAuthAndMlek } from './auth';
 import { getMlekSecret } from "@/lib/mlek";
 import { z } from 'zod';
 
@@ -26,8 +26,7 @@ const DeactivateCustomerSchema = z.object({
 // Removed local getMlekSecret
 // Fetch all active customers
 export async function getCustomers(): Promise<Customer[]> {
-  await requireAuth();
-  const secret = getMlekSecret(false);
+  const secret = await requireAuthAndMlek();
   const rows = db.prepare("SELECT * FROM customers WHERE is_active = 1 ORDER BY name ASC").all() as Customer[];
 
   return rows.map(r => ({

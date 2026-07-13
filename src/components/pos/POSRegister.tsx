@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Search, ShoppingCart, Trash2, Plus, Minus, Tag, Truck, Receipt, Loader2, AlertTriangle } from 'lucide-react';
 import { getInventory } from '@/app/actions/inventory';
 import { formatCurrency, formatQuantity } from '@/lib/format';
-import { InventoryItem } from '@/types';
+import { InventoryItem } from '@/types/inventory';
 import { CartItem } from '@/app/actions/transactions';
 import CheckoutModal from './CheckoutModal';
 

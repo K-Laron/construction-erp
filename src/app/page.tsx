@@ -10,7 +10,7 @@ import ShiftBar from '@/components/pos/ShiftBar';
 import CustomerManager from '@/components/crm/CustomerManager';
 import InventoryManager from '@/components/inventory/InventoryManager';
 import DeliveryDispatch from '@/components/deliveries/DeliveryDispatch';
-import ReportsPanel from '@/components/reports/ReportsPanel';
+import ReportsPanel from '@/features/reports/ReportsPanel';
 import MaintenancePanel from '@/components/maintenance/MaintenancePanel';
 import A6PrintReceipt from '@/components/print/A6PrintReceipt';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
