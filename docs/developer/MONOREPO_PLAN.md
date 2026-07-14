@@ -11,6 +11,11 @@ critical path to shipping. The product questions that would gate Track B are now
 in §20 (default: no offline writes for v1); Track B is revisited only if that decision
 changes.
 
+**Micro-edit note (post second review):** Pull projection contract (§2c), bearer-token
+store (§8), nested-transaction / write-queue scope (§6), LAN TLS ops (§16 Phase 0),
+package tree honesty (§3), cache IPC (typed reads preferred), component migration honesty
+(§14), and test-count wording (§18) were patched for executability.
+
 ---
 
 ## 1. Motivation
@@ -115,13 +120,15 @@ database. There is no local write path. `core-logic` itself continues to run
 
 ### Cache refresh (reads only)
 
-Desktop and mobile pull from the server periodically and after reconnecting:
+Desktop and mobile pull from the server periodically and after reconnecting. The
+wire format and projection rules are defined in **§2c** (do not invent ad-hoc full-table
+dumps in client code).
 
 ```
-GET /api/sync/pull?since={last_sync_timestamp}
-  → Returns records changed on the server since last sync
-  → Format: { table, row_id, operation: "insert"|"update"|"delete", data }
-  → Local cache applies changes (read-only projection, not user-editable)
+GET /api/sync/pull?cursor={opaque_server_cursor}
+  → Returns changed projection rows since cursor (or full snapshot if cursor omitted / "0")
+  → Format: { next_cursor, changes: [{ table, row_id, operation, data }] }
+  → Local cache applies via apply_pull_patch only (never from UI SQL)
 ```
 
 This is the **only** way the local cache is written to. The UI never issues a write
@@ -165,40 +172,117 @@ server"` actions call — no business logic is duplicated, only the transport di
 
 ---
 
+## 2c. Pull projection contract (Track A)
+
+This section exists so Phase 3–4 implementers do not invent an unbounded “sync everything”
+endpoint. Pull is a **role-filtered, server-authored projection** of catalog and
+operational read models — not a dump of the authoritative ledger.
+
+### Cursor (not device wall-clock)
+
+- Query param: `cursor` — opaque string issued by the server in the previous response’s
+  `next_cursor` (or omitted / `"0"` for first full snapshot).
+- Server advances the cursor using a **server-monotonic** source only: e.g. a
+  `sync_revision INTEGER` (or equivalent) bumped on relevant writes, **not** client
+  `Date.now()` and not untrusted device clocks.
+- Response always includes `next_cursor` the client must store for the next pull.
+- Clock skew between devices is irrelevant for pull ordering because clients never
+  contribute timestamps to the cursor.
+
+### Tables / projections in scope for Track A cache
+
+Include only fields needed for offline **reads** and online UI fill while online.
+**Do not** push MLEK-encrypted ciphertext for clients to decrypt (Track A clients have
+no MLEK — §12). Server decrypts and emits plain projections where policy allows.
+
+| Projection table (cache) | Source | Typical fields | Notes |
+|---|---|---|---|
+| `inv_items` | `inventory` | id, name, category, unit, stock_quantity, selling_price, wholesale_price, reorder_level, is_active | Omit internal cost if role policy requires (see AuthZ) |
+| `cust_list` | `customers` | id, name, price_tier, is_vat_exempt, is_active | **Driver role:** name + delivery-relevant fields only. No credit_limit, current_balance, phone, or address on driver devices. Cashier/office may get extended fields per existing web RBAC. Rationale in §12: no client MLEK, so plaintext PII on a lost driver phone is unacceptable — the pull endpoint is the enforcement point. |
+| `open_deliveries` | `transactions` + delivery status | transaction_id, customer name, delivery_status, date, totals summary | Not full GL |
+| `delivery_lines` | remaining/dispatch lines as needed | item_id, remaining qty, names | Read model for dispatch UI |
+| Soft deletes | any of the above | `operation: "delete"` or `is_active: 0` | Clients must apply deletes; never leave stale rows |
+
+**Out of projection (never in client cache in Track A):** `journal_*`, raw HMAC
+signatures, full `customer_ledger` / `supplier_ledger` chains, backup blobs, user
+passcode hashes/salts, system_config MLEK material, arbitrary SQL dump of server DB.
+
+### AuthZ on pull
+
+- Require authenticated session (cookie or bearer).
+- Filter payload by role the same way read APIs do:
+  - **Cashier:** inventory sell prices + stock, customers needed for POS, own shift-relevant delivery queue as product defines.
+  - **Manager/Admin:** may include cost_price and broader lists if existing web RBAC allows.
+- Never return another tenant’s data (single-store product, but still no “dump all users’ PINs”).
+- Cost fields: if web UI hides cost from cashiers today, pull must too.
+
+### First sync vs incremental
+
+1. **First install / empty cache:** `GET /api/sync/pull` with no cursor (or `cursor=0`) →
+   full snapshot of allowed projections + `next_cursor`.
+2. **Incremental:** pass last `next_cursor` → only changes since that revision.
+3. If server cannot serve incremental (cursor too old / schema bump): respond with
+   `410` or a dedicated `full_resync: true` payload and force full snapshot.
+
+### Client apply rules
+
+- Only `apply_pull_patch` (or equivalent) may write the local SQLite file.
+- UI code paths use typed cache readers (preferred) or a **whitelist of read SQL
+  templates** — not free-form SQL from the webview for production (see §6).
+- After any successful **mutating** HTTP call, client should either await a pull or
+  optimistically update only non-authoritative UI state; authoritative numbers always
+  come from the server response body for that action.
+
+---
+
 ## 3. Package catalog
 
-Packages (9 total) — unchanged from the original plan in shape, with two scope notes:
+**Target end-state packages** (up to 9 names in the long-term graph). **Track A does not
+create packages it does not use.**
 
 ```
-packages/
+packages/   # Track A creates these:
 ├── repo-types/
 ├── repo-format/
-├── repo-crypto/          # server-only in Track A — see §16b mobile crypto note
+├── repo-crypto/          # server-only — see §16b
 ├── repo-db-schema/
-├── repo-core-db/
-│   └── interface.ts
-├── repo-core-logic/      # runs on the server only — desktop/mobile never import this
-├── repo-db-web/
-├── repo-db-local/        # Track A: read-replica adapter only (no write commands)
-└── repo-sync/            # Track B: offline write queue — not built in Track A
+├── repo-core-db/         # DbConnection + SessionManager interfaces
+├── repo-core-logic/      # server-only runtime consumer in Track A
+├── repo-db-web/          # better-sqlite3 adapter (host)
+├── repo-db-local/        # read-replica adapter (desktop + mobile)
+└── repo-http-client/     # typed fetch wrappers for desktop/mobile (Track A)
+
+# NOT created in Track A Phase 1:
+# └── repo-sync/          # Track B ONLY — offline write queue; do not scaffold until §20 decision 13 flips
 ```
+
+**Phase 1 may start smaller** to reduce churn, then split:
+
+| Minimal first cut (optional) | Later split into |
+|---|---|
+| `@repo/types` | (stays) |
+| `@repo/core` (crypto + format + core-logic) | `repo-crypto`, `repo-format`, `repo-core-logic` |
+| `@repo/db` (schema + web adapter) | `repo-db-schema`, `repo-db-web` |
+
+Either layout is valid; the dependency rule is what matters: **apps/desktop and
+apps/mobile never depend on `repo-core-logic` or `repo-db-web` at runtime** — only
+`http-client` + `db-local` (+ types/format as needed for UI).
 
 ```
 apps/
 ├── web/
 │   ├── src/app/actions/     # Thin "use server" wrappers: auth → core-logic
-│   └── src/app/api/         # New: HTTP API routes (§2b) + sync/pull
+│   └── src/app/api/         # HTTP API routes (§2b) + sync/pull (§2c)
 ├── desktop/                 # Tauri v2 + React
-│   ├── src/                 # React frontend (imports @repo/http-client, @repo/db-local)
-│   └── src-tauri/           # Rust backend — narrowed command set, see §6
+│   ├── src/                 # React frontend (http-client + db-local)
+│   └── src-tauri/           # Rust — narrowed command set, see §6
 └── mobile/                  # Expo React Native
-    └── src/                 # Touch-optimized UI
+    └── src/                 # Touch-optimized UI (same workflows, adapted layout — §14)
 ```
 
-`repo-core-logic` is listed as a shared package for historical/future reasons (Track B
-would need it to validate offline writes client-side in some designs), but **in Track A
-it has exactly one runtime consumer: the server.** Desktop and mobile only ever talk to
-it over HTTP.
+`repo-core-logic` has **exactly one Track A runtime consumer: the server** (`apps/web`
+host). Desktop and mobile only ever talk to it over HTTP. `repo-sync` is not part of
+Track A’s tree until Track B is explicitly approved.
 
 ---
 
@@ -293,15 +377,18 @@ specifically (checkout: stock deduction + GL posting), and it would pass all exi
 tests while still being wrong under concurrent traffic. **Risk level raised from Medium to
 High** — see §18.
 
-**Fix: a simple async queue in front of the connection**, serializing all transactions:
+**Fix: AsyncLocalStorage-based depth tracking with SAVEPOINT for nested calls**, serializing top-level transactions while allowing safe nesting:
 
 ```typescript
 // packages/repo-db-web/src/index.ts
+import { AsyncLocalStorage } from 'node:async_hooks';
 import Database from 'better-sqlite3';
 
 export class WebDbConnection implements DbConnection {
   private db: Database.Database;
   private queue: Promise<unknown> = Promise.resolve();
+  private spCounter = 0;
+  private txContext = new AsyncLocalStorage<{ depth: number }>();
 
   constructor(path: string) {
     this.db = new Database(path);
@@ -322,12 +409,32 @@ export class WebDbConnection implements DbConnection {
   }
 
   async transaction<T>(fn: (db: DbConnection) => Promise<T>): Promise<T> {
-    // Chain onto the queue so only one transaction is ever open on this
-    // connection at a time, regardless of how many requests arrive concurrently.
+    // Genuinely nested call — we're inside the same async call chain
+    // that already holds this connection's top-level transaction.
+    // AsyncLocalStorage guarantees this: an unrelated concurrent request
+    // cannot see this context, unlike a shared counter that would confuse
+    // "my own nested call" with "an unrelated request that happened to
+    // arrive while my tx is open."
+    const ctx = this.txContext.getStore();
+    if (ctx) {
+      const sp = `sp_${++this.spCounter}`;
+      this.db.exec(`SAVEPOINT ${sp}`);
+      try {
+        const result = await fn(this);
+        this.db.exec(`RELEASE ${sp}`);
+        return result;
+      } catch (e) {
+        this.db.exec(`ROLLBACK TO ${sp}`);
+        throw e;
+      }
+    }
+
+    // Top-level call — enqueue so unrelated concurrent requests serialize
+    // instead of interleaving on this connection.
     const run = async () => {
       this.db.exec('BEGIN');
       try {
-        const result = await fn(this);
+        const result = await this.txContext.run({ depth: 1 }, () => fn(this));
         this.db.exec('COMMIT');
         return result;
       } catch (e) {
@@ -336,7 +443,6 @@ export class WebDbConnection implements DbConnection {
       }
     };
     const result = this.queue.then(run, run);
-    // Keep the queue alive even if this transaction fails, so later ones still run.
     this.queue = result.catch(() => undefined);
     return result;
   }
@@ -345,12 +451,42 @@ export class WebDbConnection implements DbConnection {
 }
 ```
 
-This is the minimum fix — a FIFO queue per connection. It trades some concurrency
+This is the minimum correct fix — `AsyncLocalStorage` for call-stack lineage + FIFO queue for top-level serialization + SAVEPOINT for genuine nesting without queue deadlock. It trades some concurrency
 (transactions are now fully serialized, not just isolated) for correctness, which is the
 right tradeoff for a single-SQLite-file server; `better-sqlite3` was already effectively
 serializing writes at the OS/file level, so the throughput cost is small. If this becomes
 a bottleneck later, a small worker pool with multiple connections (each independently
 queued) is the next step — not needed at current scale.
+
+### Write paths outside `transaction()` must also be safe
+
+The queue above only serializes work that goes through `transaction()`. **Any
+`prepare().run()` that mutates money/stock outside that API is still racy** under
+concurrent requests. Rule for Track A extraction:
+
+- All multi-statement money/stock paths (checkout, payment, receive goods, returns, etc.)
+  **must** use a single top-level `db.transaction(...)`.
+- Prefer routing **all** mutating `run()` calls through the same queue (e.g. queue
+  every `run`/`exec`, not only `transaction`), **or** document and enforce “mutations
+  only inside `transaction()`” via code review + lint if practical.
+
+### Nested transactions — why `AsyncLocalStorage` and not a counter
+
+The first version of this fix used a shared `txDepth` counter. That's wrong:
+two concurrent top-level requests, A and B, would see the same counter. If B
+arrives while A is mid-transaction (i.e. `await`-ing inside `fn(this)`), B
+would incorrectly take the `SAVEPOINT` branch — running inside A's still-open
+transaction. If A later rolls back, B's already-committed writes roll back with
+it, silently. `AsyncLocalStorage` solves this because it is scoped to the async
+call chain: B's `transaction()` call runs outside A's ALS context regardless
+of timing, so `getStore()` returns `undefined` and B correctly enqueues behind
+A on the FIFO queue.
+
+**Concurrency test requirement (§18):** the test must include not just "nested
+journal posting within one checkout" (which the broken counter version also
+handles correctly, masking the bug) but **two concurrent top-level checkouts
+firing simultaneously**, asserting each gets an independent `BEGIN`/`COMMIT`
+and that a failure in one never rolls back the other's committed state.
 
 ### Desktop/mobile local cache — read-only, no transaction semantics needed
 
@@ -363,16 +499,20 @@ Track B, where it would apply to the offline write queue.
 
 | Command | Purpose |
 |---|---|
-| `db_get(sql, params)` | Single-row read from local cache |
-| `db_all(sql, params)` | Multi-row read from local cache |
-| `apply_pull_patch(patch)` | Internal — applies a server pull patch to local cache; not exposed to arbitrary UI calls |
-| `run_migrations()` | Apply cache schema migrations (no secret argument needed — see §12, cache holds no encrypted columns) |
-| `session_get/set/del` | File-based session (bearer token storage) |
-| `file_read/write` | Local file I/O for received/shared files (e.g. a downloaded backup handed off via `showSaveDialog` — see §13); the backup bytes themselves are opaque to the client |
+| `cache_query(name, params)` **(preferred)** | Typed/whitelisted read by name (e.g. `list_inventory`, `get_customer`) — no free-form SQL from UI |
+| `db_get` / `db_all` **(dev-only or tightly gated)** | If kept, allow only in debug builds or behind a SQL template whitelist; production clients should use `cache_query` |
+| `apply_pull_patch(patch)` | Sole path that mutates local cache; applies server pull payload (§2c); not for arbitrary UI SQL |
+| `run_migrations()` | Apply cache schema migrations (no MLEK secret — §12) |
+| `session_get/set/del` | Store bearer token string only (opaque to Rust) |
+| `file_read/write` | Optional opaque file bytes (e.g. download host-produced backup — §13); not required for core POS |
 
 `db_run`, `db_begin`, `db_commit`, `db_rollback` are **removed** from Track A — there is
 no write path for the UI to reach through them. They would return in a reviewed, scoped
 form only if Track B is built.
+
+**Security note:** Free-form `db_get`/`db_all(sql)` from the webview is better than
+`db_run` but still allows data exfil / expensive queries if the webview is compromised.
+Prefer typed `cache_query` in production builds.
 
 `mlek_set`/`mlek_get` are **not part of Track A's Rust surface at all** — resolved in
 §12: the local cache holds no encrypted data and desktop/mobile perform no local
@@ -407,7 +547,7 @@ export interface SessionManager {
 | `getActiveUserId` | `iron-session` cookie | Bearer token, validated server-side per request | Bearer token, validated server-side per request |
 | `createSession` | `iron-session` save, returns cookie | Returns bearer token, stored via Tauri `session_set` | Returns bearer token, stored via `expo-secure-store` |
 | `destroySession` | `iron-session` destroy | `session_del` + server-side token revocation | `expo-secure-store` delete + server-side token revocation |
-| `getClientIP` | `headers()` from `next/headers` | Real client IP from the HTTP request (server-side) | Real client IP from the HTTP request (server-side) |
+| `getClientIP` | `headers()` / trusted proxy rules as host already defines | Real client IP from the HTTP request (server-side) | Real client IP from the HTTP request (server-side) |
 
 Note the change from the original plan: `getClientIP` no longer hardcodes `'127.0.0.1'`
 for desktop/mobile. Since all writes now go over real HTTP to the server (§2b), the
@@ -415,6 +555,47 @@ server sees the actual LAN IP of the requesting device and can apply the same IP
 logic it already uses for web — no special-casing needed. The original plan's rate-limiting
 rationale (`decision 5`, OS lock screen as the auth boundary) still applies to the PIN/
 lockout logic itself, but the client IP is no longer synthetic.
+
+### Bearer token persistence (Phase 2b — required design)
+
+Client-side “token in a file / secure store” is **not** enough by itself. The **server**
+must be able to validate and revoke tokens.
+
+**Track A default: opaque bearer tokens + server table** (simpler revocation than pure JWT):
+
+```sql
+-- Migration on the host DB (Track A / Phase 2b)
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id            TEXT PRIMARY KEY,           -- public token id (optional prefix of secret)
+  user_id       TEXT NOT NULL REFERENCES users(id),
+  token_hash    TEXT NOT NULL UNIQUE,       -- SHA-256 (or similar) of the secret; never store raw token
+  created_at    TEXT NOT NULL,
+  expires_at    TEXT NOT NULL,              -- e.g. 8–24h sliding or fixed; match product shift length if desired
+  revoked_at    TEXT,                       -- non-null => reject
+  last_used_at  TEXT,
+  user_agent    TEXT,                       -- optional device label
+  ip_created    TEXT                        -- optional
+);
+```
+
+**Login flow (`POST /api/auth/login`):**
+
+1. Existing PIN verification + rate limits (server-side).
+2. Generate cryptographically random secret token `tok_…`.
+3. Store `token_hash = hash(secret)` + `user_id` + `expires_at`; return **raw secret once**
+   in JSON `{ token, expires_at, user }`.
+4. Desktop: Tauri `session_set`; mobile: `expo-secure-store`.
+
+**Authenticated request:** `Authorization: Bearer <secret>` → server hashes, looks up
+row, rejects if missing / expired / `revoked_at` set; loads user role for RBAC.
+
+**Logout:** client deletes local secret; server sets `revoked_at` (best-effort if online).
+
+**JWT alternative (optional):** short-lived signed access JWT + refresh token table.
+Only choose this if you already want stateless access tokens; still need a revocation
+story for logout. Opaque tokens above are the default for this plan.
+
+Do **not** implement “unsigned token = userId” or client-minted sessions.
 
 ### Rate limiting threat model — unchanged
 
@@ -532,10 +713,29 @@ in `@repo/crypto` — see the mobile crypto note in §16.
 
 ---
 
-## 14. Component migration — unchanged
+## 14. Component migration — workflows first, not pixel parity
 
-Mobile nav (bottom tabs replacing the sidebar) remains the only major UI-structural
-change; all 6 view screens stay the same across platforms.
+**Track A goal:** same **workflows** (POS checkout, inventory browse, customers,
+deliveries, reports read, maintenance as role allows) on each client — **not** a
+guarantee of pixel-identical ports of every web component.
+
+| Surface | Layout | UI strategy (Track A) |
+|---|---|---|
+| Web | Existing sidebar + header | Unchanged; keeps Server Actions + optional HTTP |
+| Desktop (Tauri) | Sidebar/header acceptable (large screen) | Prefer reusing React components via shared package **or** copy-adapt from web; desktop is not Next.js |
+| Mobile (Expo) | **Bottom tabs + top bar** (replaces sidebar) | **Reimplement screens** with touch targets ≥44px, keyboard-avoiding checkout; shared `@repo/types` + `http-client` only at first |
+
+**Explicit non-goals for Track A Phase 4:**
+
+- Full design-system extraction of every web component into a shared UI package (nice later)
+- Wrapping the entire Next app in a WebView as the long-term mobile architecture
+- Pixel parity with web density on a 5–6" phone
+
+**Honest effort implication:** Phase 4 estimates assume **functional** mobile workflows
+against the HTTP API, possibly with simplified tables/lists, not a line-by-line port of
+all web modals on day one. Expand fidelity after the API is stable.
+
+Optional later: `@repo/ui` for buttons/inputs shared by desktop + mobile.
 
 ---
 
@@ -555,68 +755,84 @@ The original "static export smoke test" is removed — `apps/desktop` was alread
 specified as plain React (no Next.js), so static-exporting the Next app was never
 actually on Track A's critical path; it tested the wrong thing. Replaced with:
 
-- Verify the Next.js server boots and serves the HTTP API (§2b) to an external client on
-  the same LAN — i.e., `curl` a login + a read endpoint from another machine on the WiFi
-- Tauri scaffold — verify dev/build loop and that it can `fetch()` the server over LAN
+- Verify the Next.js server boots and serves over the LAN — initially even a simple
+  health/read path; full §2b routes land in Phase 2b
+- Tauri scaffold — verify dev/build loop and that it can `fetch()` the host on LAN
 - Expo scaffold — verify build loop and the same LAN `fetch()`
-- pnpm workspace move — confirm it doesn't break the existing test suite
+- pnpm workspace move smoke (or dry-run) — confirm tooling direction
+- **LAN TLS / trust (ops — do not skip):** real shops hit certificate trust issues.
+  Document one supported path before calling Phase 0 done:
+  - **Preferred:** HTTPS with a LAN CA (e.g. mkcert) installed on desktop OS **and**
+    Android user trust store / network security config for Expo, **or**
+  - **Dev/LAN fallback:** HTTP + `SESSION_SECURE=false` (or equivalent) with explicit
+    “trusted WiFi only” warning in operator docs. **This transmits bearer tokens in
+    cleartext — see §18 risk register.** Not a supported production deployment.
+  Phase 0 exit: at least one external device successfully authenticates or hits a
+  protected route under the chosen trust mode.
 
 **Phase 1 — Monorepo scaffold (4-6 days)**
 
 - pnpm workspace + turborepo
-- Extract `@repo/types`, `@repo/format`, `@repo/crypto` (server-only, see §16 crypto note)
-- Extract `@repo/db-schema` (migrations as typed array — no version-column changes yet,
+- Create **Track A packages only** (§3) — do **not** scaffold `repo-sync`
+- Extract `@repo/types`, `@repo/format`, `@repo/crypto` (server-only, see §16b)
+  — or the minimal first-cut packages in §3
+- Extract `@repo/db-schema` (migrations as typed array — no CAS `version` columns yet;
   those are Track B, see §7)
 - Move existing app to `apps/web/`
 - Rewire imports (~80 statements)
-- Verify: existing test suite passes (`turbo run test`)
+- Verify: **current** vitest/turbo suite passes (record suite size in CI; do not assume
+  a fixed “110+” count)
 
 **Phase 2 — Core logic extraction (2-3 weeks)**
 
 - Week 1: Define `DbConnection`/`SessionManager` interfaces. Implement `@repo/db-web`
-  with the connection-queue fix (§6). Extract `auth.ts` + `unlock.ts`.
+  with the connection-queue fix, nested SAVEPOINT rules, and write-path rules (§6).
+  Extract `auth.ts` + `unlock.ts`.
 - Week 2: Extract 5 files in parallel: `store`, `inventory`, `customers`, `shifts`, `ledger`.
-- Week 3: Extract `transactions.ts` (biggest, dedicated review — includes a concurrency
-  test against the new queued-transaction adapter), `deliveries.ts`, `backup.ts`.
-- Verify: full test suite passes; every extracted file has a thin `"use server"` wrapper
-  confirming web still works.
+- Week 3: Extract `transactions.ts` (biggest — concurrency test with nested journal
+  posting against queued adapter), `deliveries.ts`, `backup.ts`.
+- Verify: full existing suite + new adapter tests pass; thin `"use server"` wrappers
+  keep web UX working.
 
 **Phase 2b — HTTP API (1-2 weeks, new)**
 
 - Implement the route set in §2b as thin wrappers around `@repo/core-logic`
-- Bearer-token mode in `SessionManager`
-- Verify: `curl` login + checkout + a read endpoint end-to-end against a running server
+- Bearer-token mode: `api_tokens` table + hash storage (§8)
+- Implement `GET /api/sync/pull` per §2c (cursor, projections, AuthZ)
+- Verify: `curl` login + checkout + pull (empty cursor + incremental) end-to-end
 
 **Phase 3 — Desktop client (2-3 weeks)**
 
-- Create `apps/desktop` (React, no Next.js — connects to server via `@repo/http-client`)
-- Rust backend: narrowed command set from §6 (reads + pull-patch apply + session + file
-  I/O — no write proxy, no MLEK, see §12)
-- Implement `@repo/db-local` desktop adapter as a read-only cache
-- Build `apps/desktop` UI (same screens, native window)
-- Verify: desktop boots, connects to server, all writes round-trip through the server,
-  cached reads work, mutating actions are disabled with a clear message when offline
+- Create `apps/desktop` (React, no Next.js — `@repo/http-client`)
+- Rust backend: narrowed command set from §6 (typed cache reads preferred, pull-patch,
+  session, optional file I/O — no write proxy, no MLEK)
+- Implement `@repo/db-local` as read-only cache applying §2c patches only
+- Build desktop UI for the same **workflows** as web (§14), native window
+- Verify: boots, server-first writes, cached reads, mutates disabled when offline
 
 **Phase 4 — Mobile client (2.5-3.5 weeks)**
 
 - Create `apps/mobile` with Expo
 - Implement `@repo/db-local` mobile adapter (read-only, `expo-sqlite`)
-- Install `expo-secure-store`, `expo-file-system`, `expo-sharing`
-- Build bottom tab navigation, port all 6 view screens
-- Verify: same acceptance criteria as desktop
+- Install `expo-secure-store` (bearer token). `expo-file-system` / `expo-sharing` are
+  **optional** (opaque backup download convenience only — not required for POS)
+- Bottom tab navigation; implement mobile layouts for core workflows (§14) — not
+  pixel-parity ports of every web modal
+- Verify: same acceptance criteria as desktop (login, read, server-side checkout when
+  online, blocked mutates offline)
 
 **Phase 5 — CI & Polish (1 week)**
 
-- GitHub Actions for all 3 apps
-- Full test pass (core-logic + adapter tests)
-- Smoke tests: all 3 platforms running the same business logic against the same server
+- GitHub Actions for apps that exist (web required; desktop/mobile as they land)
+- Full test pass (core-logic + adapter + API tests)
+- Smoke: all shipped clients against one host; document LAN TLS mode
 
 ### Track B (deferred — see §20; not scheduled unless decision 13 changes)
 
 **Phase 6 — Offline write queue** — implement §9 in full: `offline_log`, `flushed_log`,
-row-versioning schema migration, `repo-sync`, conflict-resolution UI, scoped Rust write
-commands. Only for the operations on the allowlist in §9 — never checkout, payments, or
-sequence assignment.
+row-versioning schema migration, **create `repo-sync` for the first time**, conflict-
+resolution UI, scoped Rust write commands. Only allowlisted ops in §9 — never checkout,
+payments, or sequence assignment.
 
 ---
 
@@ -657,15 +873,20 @@ across two platforms. Not scheduled unless the "no offline writes for v1" defaul
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Async transaction interleaving on shared `better-sqlite3` connection | **High** (raised from Medium) | Connection-queue fix in §6; serializes all transactions on the connection |
-| Phase 2 extraction causes subtle async bugs in checkout transaction | High | Dedicated concurrency test against the queued adapter; async-migration guardrails per transaction site |
-| 110+ existing tests regress | High | Tests run after every file extraction; extract one action at a time. (Confirm current suite size before treating "110+" as fact — verify against the actual repo.) |
+| Async transaction interleaving on shared `better-sqlite3` connection | **High** (raised from Medium) | Connection-queue fix in §6; serialize txs; queue or ban mutating `run` outside `transaction()` |
+| Nested `BEGIN` from journal helpers inside checkout | **High** | `AsyncLocalStorage` scoping in §6 prevents silent cross-request nesting. Concurrency test must include **both** (a) nested journal posting within one checkout, **and** (b) two concurrent top-level checkouts asserting independent BEGIN/COMMIT — the former passes even with the broken shared-counter version and masks the bug. |
+| Phase 2 extraction causes subtle async bugs in checkout transaction | High | Dedicated concurrency test against the queued adapter; extract one action at a time |
+| Existing test suite regresses | High | Run full suite after every extraction. **Do not assume “110+”** — use the actual count from `npm test` / `turbo test` at kickoff (historically ~48–70+ depending on branch). Grow suite as adapters land. |
 | HTTP API missing was an unstated dependency for Phase 3/4 | Medium (addressed) | Phase 2b added explicitly; Track A cannot ship without it |
-| Rust IPC exposing arbitrary write SQL from the webview | Resolved in Track A | Read-only cache removes the need for `db_run`; Track B would reintroduce a scoped, reviewed version only |
-| `invoice_sequence` client-assigned offline | Resolved | Reclassified as server-serialized, excluded from any offline allowlist — §5b, §9 |
-| HTTP connection from desktop/mobile to server fails intermittently | Low | Exponential backoff, offline banner, manual "retry now" for reads; mutating actions simply disabled (Track A has no queue to retry) |
-| Rust learning curve | Low-Medium | Narrower command set than original (~200 lines, no write proxy) |
-| MLEK on mobile/desktop — PII exposure if device lost | Resolved | No MLEK on either client platform in Track A — the premise (local encrypted data to decrypt) doesn't exist once the cache is read-only and backup is host-only. See §12. |
+| Pull endpoint becomes unbounded data dump | Medium | §2c projection + role filter + server cursor |
+| Free-form read SQL from webview | Low–Medium | Prefer typed `cache_query`; whitelist if raw SQL kept |
+| Bearer tokens without server revocation | Medium | `api_tokens` table + hash + revoke (§8) |
+| LAN HTTPS trust failure forces HTTP fallback, exposing bearer tokens in cleartext | Medium | Mitigations (apply one): **A)** prefer mkcert/LAN CA install on all devices (documented path), **B)** if HTTP fallback used, require short-lived tokens (≤4h sliding) and document "trusted LAN only, do not use on shared/public WiFi". The HTTP path is a dev convenience or last resort, not a supported production deployment. |
+| Rust IPC exposing arbitrary write SQL from the webview | Resolved in Track A | Read-only cache removes `db_run`; Track B scoped writes only |
+| `invoice_sequence` client-assigned offline | Resolved | Server-serialized — §5b, §9 |
+| HTTP connection from desktop/mobile fails intermittently | Low | Offline banner; mutates disabled (no write queue in Track A) |
+| Rust learning curve | Low-Medium | Narrower command set (~typed cache + patch + session) |
+| MLEK on mobile/desktop — PII if device lost | Resolved | No client MLEK in Track A — §12 |
 
 ---
 
@@ -688,6 +909,11 @@ across two platforms. Not scheduled unless the "no offline writes for v1" defaul
 | 13 | **Offline write support: no, for v1** | Track A ships "read cached data, block writes while offline" (§2). Revisit only if the business identifies a concrete case where blocked writes during a real outage are unacceptable — see §20 | New |
 | 14 | **Host: the existing counter/store PC runs `apps/web`; desktop is a client, not a host** | Avoids building and maintaining a second "desktop-as-host" mode with no current requirement driving it; nothing in the client architecture blocks adding one later | New |
 | 15 | **Tauri (not Electron) confirmed** | The narrowed Track A Rust surface (§6) is ~120 lines with no MLEK and no write proxy — smaller than originally scoped, which further reduces the Rust-hiring-risk concern that would have motivated Electron | New |
+| 16 | **Pull uses server cursor + role-filtered projections (§2c)** | Avoid device-clock `since` and full DB dumps; no encrypted-column decrypt on clients | New |
+| 17 | **Opaque bearer tokens hashed in `api_tokens` (§8)** | Revocable sessions for desktop/mobile without inventing unsigned client tokens | New |
+| 18 | **`repo-sync` not scaffolded in Track A** | Package tree honesty; offline queue is Phase 6 only | New |
+| 19 | **Typed cache reads preferred over free-form SQL IPC** | Reduce webview data-exfil surface even for reads | New |
+| 20 | **Mobile = same workflows, adapted UI — not pixel parity (§14)** | Keeps Phase 4 estimates honest | New |
 
 ---
 
@@ -726,10 +952,16 @@ remain available, reviewed, and ready to reintroduce if a decision changes.
 
 ## Verification checklist (Track A)
 
-- `turbo test` / existing suite green after the monorepo move
+- `turbo test` / existing suite green after the monorepo move (record baseline test count
+  at kickoff; do not hardcode “110+”)
 - Web checkout/GL tests still pass through thin `"use server"` wrappers
+- Nested journal-inside-checkout works under the queued `WebDbConnection` (concurrency test)
+- `api_tokens`: login returns bearer; revoked/expired tokens fail; logout revokes server-side
+- `GET /api/sync/pull`: full snapshot + incremental cursor; role filter omits forbidden fields
 - Desktop/mobile can log in (bearer token) and read inventory/customers over LAN with no
   local MLEK required for those reads
+- Local cache only mutates via pull patches — no UI path calls write SQL
 - A checkout attempted from desktop or mobile with the server unreachable is **blocked in
   the UI**, not queued — confirms no local write path exists
 - `curl`-ing the HTTP API routes directly (§2b) succeeds independent of any client app
+- Documented LAN TLS or HTTP-dev trust mode works on at least one non-host device (§16 Phase 0)
